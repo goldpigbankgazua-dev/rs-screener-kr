@@ -1,123 +1,163 @@
-"""한국 주식 RS 스크리너 데이터 업데이트 (고속 버전)."""
+"""한국 주식 RS 스크리너 데이터 업데이트.
+
+FinanceDataReader(종목 리스트, 네이버 기반) + yfinance(가격, 야후 기반).
+KRX 직접 호출을 피해서 GitHub Actions IP 차단을 우회한다.
+"""
 
 from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
-from pykrx import stock
+import FinanceDataReader as fdr
+import yfinance as yf
 
-PERIODS = [("1W", 7), ("1M", 31), ("3M", 93), ("6M", 186), ("12M", 372)]
+PERIODS = [("1W", 5), ("1M", 21), ("3M", 63), ("6M", 126), ("12M", 252)]
 RS_WEIGHTS = {"1M": 0.20, "3M": 0.20, "6M": 0.30, "12M": 0.30}
-
 OUT_DIR = Path(__file__).resolve().parents[1] / "data"
 OUT_FILE = OUT_DIR / "stocks.json"
 
 
-def find_business_day(target: datetime, max_back: int = 10) -> str:
-    for i in range(max_back):
-        d = (target - timedelta(days=i)).strftime("%Y%m%d")
+def fetch_listing() -> pd.DataFrame:
+    kospi = fdr.StockListing("KOSPI")
+    kosdaq = fdr.StockListing("KOSDAQ")
+    kospi["Market"] = "KOSPI"
+    kosdaq["Market"] = "KOSDAQ"
+    df = pd.concat([kospi, kosdaq], ignore_index=True)
+    if "Code" not in df.columns and "Symbol" in df.columns:
+        df["Code"] = df["Symbol"]
+    df["YF"] = df.apply(
+        lambda r: f"{r['Code']}.{'KS' if r['Market'] == 'KOSPI' else 'KQ'}", axis=1
+    )
+
+    def keep(name) -> bool:
+        if not isinstance(name, str): return False
+        if any(k in name for k in ("스팩", "우B", "우C", "리츠")): return False
+        if name.endswith("우"): return False
+        return True
+
+    df = df[df["Name"].apply(keep)].reset_index(drop=True)
+    return df
+
+
+def fetch_prices(tickers: list[str], start: str, end: str) -> pd.DataFrame:
+    closes: dict[str, pd.Series] = {}
+    batch_size = 200
+    total = len(tickers)
+    for i in range(0, total, batch_size):
+        batch = tickers[i:i + batch_size]
+        print(f"  batch {i + 1}-{i + len(batch)}/{total}", file=sys.stderr)
         try:
-            df = stock.get_market_ohlcv(d, market="KOSPI")
-            if df is not None and not df.empty and df["종가"].sum() > 0:
-                return d
-        except Exception:
+            data = yf.download(
+                batch, start=start, end=end,
+                group_by="ticker", threads=True, progress=False, auto_adjust=False,
+            )
+        except Exception as e:
+            print(f"  batch error: {e}", file=sys.stderr)
             continue
-    raise RuntimeError("영업일을 찾지 못했습니다")
-
-
-def fetch_panel(date_str: str) -> pd.DataFrame:
-    frames = []
-    for market in ("KOSPI", "KOSDAQ"):
-        df = stock.get_market_ohlcv(date_str, market=market)
-        if df is None or df.empty:
-            continue
-        df = df.copy()
-        df["__market__"] = market
-        frames.append(df)
-    return pd.concat(frames) if frames else pd.DataFrame()
+        for t in batch:
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    if t in data.columns.get_level_values(0):
+                        s = data[t]["Close"].dropna()
+                        if not s.empty:
+                            closes[t] = s
+                else:
+                    s = data["Close"].dropna()
+                    if not s.empty:
+                        closes[t] = s
+            except Exception:
+                pass
+        time.sleep(0.5)
+    if not closes:
+        return pd.DataFrame()
+    return pd.DataFrame(closes).sort_index()
 
 
 def main() -> int:
-    today_dt = datetime.now()
-    print("[1/5] 기준 영업일 탐색...", file=sys.stderr)
-    today = find_business_day(today_dt)
-    print(f"  -> {today}", file=sys.stderr)
+    print("[1/4] 종목 리스트 (FinanceDataReader)...", file=sys.stderr)
+    listing = fetch_listing()
+    print(f"  -> {len(listing)}개", file=sys.stderr)
 
-    print("[2/5] 기준일 전 종목 시세...", file=sys.stderr)
-    today_df = fetch_panel(today)
-    print(f"  -> {len(today_df)}개", file=sys.stderr)
-    if today_df.empty:
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=420)
+    start = start_dt.strftime("%Y-%m-%d")
+    end = end_dt.strftime("%Y-%m-%d")
+
+    print(f"[2/4] 가격 다운로드 (yfinance, {start} ~ {end})...", file=sys.stderr)
+    yf_tickers = listing["YF"].tolist()
+    prices = fetch_prices(yf_tickers, start, end)
+    if prices.empty:
+        print("가격 데이터 비어있음", file=sys.stderr)
         return 1
+    print(f"  -> {prices.shape[1]}개 종목 시세 확보", file=sys.stderr)
 
-    print("[3/5] 종목명/시총/필터링...", file=sys.stderr)
-    names = {t: stock.get_market_ticker_name(t) for t in today_df.index}
-
-    def keep(name: str) -> bool:
-        if any(k in name for k in ("스팩", "우B", "우C", "리츠")):
-            return False
-        if name.endswith("우"):
-            return False
-        return True
-
-    keep_idx = [t for t, n in names.items() if keep(n)]
-    today_df = today_df.loc[keep_idx]
-
-    try:
-        cap = stock.get_market_cap(today, market="ALL")
-        market_cap = cap["시가총액"].to_dict()
-    except Exception as e:
-        print(f"  시총 조회 실패: {e}", file=sys.stderr)
-        market_cap = {}
-
-    print("[4/5] 과거 시점별 종가 수집...", file=sys.stderr)
-    past_closes: dict[str, dict] = {}
-    for label, days_back in PERIODS:
-        past_day = find_business_day(today_dt - timedelta(days=days_back))
-        df_past = fetch_panel(past_day)
-        past_closes[label] = df_past["종가"].to_dict() if not df_past.empty else {}
-        print(f"  {label}: {past_day} -> {len(past_closes[label])}개", file=sys.stderr)
-
-    print("[5/5] 계산 + JSON 작성...", file=sys.stderr)
-    rows: list[dict] = []
-    for t in today_df.index:
-        last = float(today_df.at[t, "종가"])
-        if last <= 0:
+    print("[3/4] 기간별 수익률 계산...", file=sys.stderr)
+    prices = prices.ffill()
+    last = prices.iloc[-1]
+    returns_by_period: dict[str, pd.Series] = {}
+    for label, days in PERIODS:
+        if len(prices) <= days:
             continue
-        rets = {}
-        for label, _ in PERIODS:
-            past = past_closes.get(label, {}).get(t)
-            rets[label] = None if not past else round((last / past - 1.0) * 100.0, 2)
-        rows.append({
-            "ticker": t,
-            "name": names.get(t, t),
-            "market": today_df.at[t, "__market__"],
-            "sector": "",
-            "price": last,
-            "market_cap": float(market_cap.get(t, 0)),
-            "returns": rets,
-            "rs": None,
-        })
+        past = prices.iloc[-1 - days]
+        returns_by_period[label] = (last / past - 1.0) * 100.0
+    rets_df = pd.DataFrame(returns_by_period)
 
-    df = pd.DataFrame({r["ticker"]: r["returns"] for r in rows}).T
-    pct = df.rank(pct=True) * 100.0
+    pct = rets_df.rank(pct=True) * 100.0
     weights = pd.Series({k: v for k, v in RS_WEIGHTS.items() if k in pct.columns})
     weights = weights / weights.sum()
     rs = (pct[weights.index] * weights).sum(axis=1).round(1)
-    rs_dict = rs.to_dict()
-    for r in rows:
-        v = rs_dict.get(r["ticker"])
-        r["rs"] = None if pd.isna(v) else float(v)
+
+    print("[4/4] JSON 작성...", file=sys.stderr)
+    yf_to_meta = listing.set_index("YF")
+    today_str = end_dt.strftime("%Y%m%d")
+
+    rows: list[dict] = []
+    for yf_t, price in last.items():
+        if pd.isna(price) or price <= 0:
+            continue
+        if yf_t not in yf_to_meta.index:
+            continue
+        meta = yf_to_meta.loc[yf_t]
+        if isinstance(meta, pd.DataFrame):  # 중복 ticker 방어
+            meta = meta.iloc[0]
+        rets = {}
+        for label, _ in PERIODS:
+            s = returns_by_period.get(label)
+            if s is None or yf_t not in s.index:
+                rets[label] = None
+            else:
+                v = s[yf_t]
+                rets[label] = None if pd.isna(v) else round(float(v), 2)
+        market_cap = 0.0
+        if "Marcap" in meta.index:
+            try:
+                m = meta["Marcap"]
+                market_cap = float(m) if pd.notna(m) else 0.0
+            except Exception:
+                market_cap = 0.0
+        rs_val = rs.get(yf_t, float("nan"))
+        rows.append({
+            "ticker": str(meta["Code"]),
+            "name": str(meta["Name"]),
+            "market": str(meta["Market"]),
+            "sector": "",
+            "price": float(price),
+            "market_cap": market_cap,
+            "returns": rets,
+            "rs": None if pd.isna(rs_val) else float(rs_val),
+        })
 
     rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
-        "as_of": today,
+        "as_of": today_str,
         "count": len(rows),
         "periods": [p for p, _ in PERIODS],
         "rs_weights": RS_WEIGHTS,
