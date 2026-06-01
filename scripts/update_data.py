@@ -1,176 +1,116 @@
-"""한국 주식 RS(상대강도) 스크리너 데이터 업데이트 스크립트.
-
-pykrx로 KOSPI/KOSDAQ 전 종목의 가격을 받아와서 기간별 수익률과
-RS 점수(여러 기간 백분위의 가중 평균)를 계산해 data/stocks.json으로
-저장한다. GitHub Actions가 매일 장 마감 후에 실행한다.
-"""
+"""한국 주식 RS 스크리너 데이터 업데이트 (고속 버전)."""
 
 from __future__ import annotations
 
 import json
 import sys
-import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 from pykrx import stock
 
-# 기간별 거래일 수 (대략) — 한국 시장은 연 약 245 거래일
-PERIODS = {
-    "1W": 5,
-    "1M": 21,
-    "3M": 63,
-    "6M": 126,
-    "12M": 252,
-}
-
-# RS 점수를 계산할 때 각 기간에 부여할 가중치 (합이 1이 아니어도 됨)
-RS_WEIGHTS = {
-    "1M": 0.20,
-    "3M": 0.20,
-    "6M": 0.30,
-    "12M": 0.30,
-}
+PERIODS = [("1W", 7), ("1M", 31), ("3M", 93), ("6M", 186), ("12M", 372)]
+RS_WEIGHTS = {"1M": 0.20, "3M": 0.20, "6M": 0.30, "12M": 0.30}
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "data"
 OUT_FILE = OUT_DIR / "stocks.json"
 
 
-@dataclass
-class Row:
-    ticker: str
-    name: str
-    market: str  # "KOSPI" or "KOSDAQ"
-    sector: str
-    price: float
-    market_cap: float  # 시가총액 (원)
-    returns: dict      # {"1W": 1.23, ...} (단위: %)
-
-
-def fetch_universe(today: str) -> list[tuple[str, str]]:
-    """(ticker, market) 리스트 반환. 우선주/스팩/리츠 등은 제외."""
-    rows: list[tuple[str, str]] = []
-    for market in ("KOSPI", "KOSDAQ"):
-        tickers = stock.get_market_ticker_list(today, market=market)
-        for t in tickers:
-            name = stock.get_market_ticker_name(t)
-            # 간단한 필터 (우선주/스팩 제외)
-            if any(k in name for k in ("스팩", "우B", "우C", "리츠")):
-                continue
-            if name.endswith("우"):
-                continue
-            rows.append((t, market))
-    return rows
-
-
-def fetch_price_panel(tickers: list[str], start: str, end: str) -> pd.DataFrame:
-    """여러 종목의 종가를 한 DataFrame(index=날짜, columns=ticker)으로 받는다.
-
-    pykrx의 get_market_ohlcv_by_date는 종목별 호출이라 느리므로
-    get_market_cap_by_ticker처럼 일자별 단면 호출을 활용하지 않고,
-    종목 수가 많으므로 가격은 종목별로 받되 빠른 종가만 사용한다.
-    """
-    series_list = []
-    total = len(tickers)
-    for i, t in enumerate(tickers, 1):
+def find_business_day(target: datetime, max_back: int = 10) -> str:
+    for i in range(max_back):
+        d = (target - timedelta(days=i)).strftime("%Y%m%d")
         try:
-            df = stock.get_market_ohlcv_by_date(start, end, t)
-            if df is None or df.empty:
-                continue
-            s = df["종가"].rename(t)
-            series_list.append(s)
-        except Exception as e:  # noqa: BLE001
-            print(f"  skip {t}: {e}", file=sys.stderr)
-        if i % 50 == 0:
-            print(f"  fetched {i}/{total}", file=sys.stderr)
-        # KRX rate-limit 회피
-        time.sleep(0.05)
-    if not series_list:
-        return pd.DataFrame()
-    return pd.concat(series_list, axis=1).sort_index()
-
-
-def compute_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """columns=ticker, index=period_key, values=수익률(%)."""
-    out = {}
-    last = prices.ffill().iloc[-1]
-    for key, days in PERIODS.items():
-        if len(prices) <= days:
+            df = stock.get_market_ohlcv(d, market="KOSPI")
+            if df is not None and not df.empty and df["종가"].sum() > 0:
+                return d
+        except Exception:
             continue
-        past = prices.ffill().iloc[-1 - days]
-        out[key] = (last / past - 1.0) * 100.0
-    return pd.DataFrame(out)
+    raise RuntimeError("영업일을 찾지 못했습니다")
 
 
-def compute_rs_score(returns: pd.DataFrame) -> pd.Series:
-    """각 기간의 백분위 순위를 가중 평균해 0~100 점수로 만든다."""
-    pct = returns.rank(pct=True) * 100.0
-    weights = pd.Series(RS_WEIGHTS)
-    weights = weights[weights.index.intersection(pct.columns)]
-    if weights.empty:
-        return pd.Series(dtype=float)
-    weights = weights / weights.sum()
-    score = (pct[weights.index] * weights).sum(axis=1)
-    return score.round(1)
+def fetch_panel(date_str: str) -> pd.DataFrame:
+    frames = []
+    for market in ("KOSPI", "KOSDAQ"):
+        df = stock.get_market_ohlcv(date_str, market=market)
+        if df is None or df.empty:
+            continue
+        df = df.copy()
+        df["__market__"] = market
+        frames.append(df)
+    return pd.concat(frames) if frames else pd.DataFrame()
 
 
 def main() -> int:
-    today = datetime.now().strftime("%Y%m%d")
-    # 1년 + 여유 30거래일 정도 받자
-    start_dt = datetime.now() - timedelta(days=400)
-    start = start_dt.strftime("%Y%m%d")
+    today_dt = datetime.now()
+    print("[1/5] 기준 영업일 탐색...", file=sys.stderr)
+    today = find_business_day(today_dt)
+    print(f"  -> {today}", file=sys.stderr)
 
-    print(f"[1/4] 종목 유니버스 수집 ({today})...", file=sys.stderr)
-    universe = fetch_universe(today)
-    print(f"  -> {len(universe)}개", file=sys.stderr)
-    if not universe:
-        print("유니버스가 비었습니다.", file=sys.stderr)
+    print("[2/5] 기준일 전 종목 시세...", file=sys.stderr)
+    today_df = fetch_panel(today)
+    print(f"  -> {len(today_df)}개", file=sys.stderr)
+    if today_df.empty:
         return 1
 
-    ticker_market = dict(universe)
-    tickers = [t for t, _ in universe]
+    print("[3/5] 종목명/시총/필터링...", file=sys.stderr)
+    names = {t: stock.get_market_ticker_name(t) for t in today_df.index}
 
-    print(f"[2/4] 가격 데이터 수집 ({start} ~ {today})...", file=sys.stderr)
-    prices = fetch_price_panel(tickers, start, today)
-    if prices.empty:
-        print("가격 데이터가 비었습니다.", file=sys.stderr)
-        return 1
+    def keep(name: str) -> bool:
+        if any(k in name for k in ("스팩", "우B", "우C", "리츠")):
+            return False
+        if name.endswith("우"):
+            return False
+        return True
 
-    print(f"[3/4] 기간 수익률 및 RS 점수 계산...", file=sys.stderr)
-    rets = compute_returns(prices)  # rows=ticker, cols=period
-    rs = compute_rs_score(rets)
+    keep_idx = [t for t, n in names.items() if keep(n)]
+    today_df = today_df.loc[keep_idx]
 
-    # 시가총액 (가장 최근 영업일 기준)
     try:
-        cap_df = stock.get_market_cap_by_ticker(today, market="ALL")
-    except Exception:
-        cap_df = pd.DataFrame()
+        cap = stock.get_market_cap(today, market="ALL")
+        market_cap = cap["시가총액"].to_dict()
+    except Exception as e:
+        print(f"  시총 조회 실패: {e}", file=sys.stderr)
+        market_cap = {}
 
-    print(f"[4/4] JSON 작성...", file=sys.stderr)
+    print("[4/5] 과거 시점별 종가 수집...", file=sys.stderr)
+    past_closes: dict[str, dict] = {}
+    for label, days_back in PERIODS:
+        past_day = find_business_day(today_dt - timedelta(days=days_back))
+        df_past = fetch_panel(past_day)
+        past_closes[label] = df_past["종가"].to_dict() if not df_past.empty else {}
+        print(f"  {label}: {past_day} -> {len(past_closes[label])}개", file=sys.stderr)
+
+    print("[5/5] 계산 + JSON 작성...", file=sys.stderr)
     rows: list[dict] = []
-    last_close = prices.ffill().iloc[-1]
-    for t in tickers:
-        if t not in rets.index or pd.isna(last_close.get(t)):
+    for t in today_df.index:
+        last = float(today_df.at[t, "종가"])
+        if last <= 0:
             continue
-        name = stock.get_market_ticker_name(t)
-        try:
-            sector = stock.get_market_sector_name(today, t) or ""
-        except Exception:
-            sector = ""
-        market_cap = float(cap_df.loc[t, "시가총액"]) if t in cap_df.index else 0.0
-        r = rets.loc[t].to_dict()
+        rets = {}
+        for label, _ in PERIODS:
+            past = past_closes.get(label, {}).get(t)
+            rets[label] = None if not past else round((last / past - 1.0) * 100.0, 2)
         rows.append({
             "ticker": t,
-            "name": name,
-            "market": ticker_market[t],
-            "sector": sector,
-            "price": float(last_close[t]),
-            "market_cap": market_cap,
-            "returns": {k: (None if pd.isna(v) else round(float(v), 2)) for k, v in r.items()},
-            "rs": None if pd.isna(rs.get(t, float("nan"))) else float(rs[t]),
+            "name": names.get(t, t),
+            "market": today_df.at[t, "__market__"],
+            "sector": "",
+            "price": last,
+            "market_cap": float(market_cap.get(t, 0)),
+            "returns": rets,
+            "rs": None,
         })
+
+    df = pd.DataFrame({r["ticker"]: r["returns"] for r in rows}).T
+    pct = df.rank(pct=True) * 100.0
+    weights = pd.Series({k: v for k, v in RS_WEIGHTS.items() if k in pct.columns})
+    weights = weights / weights.sum()
+    rs = (pct[weights.index] * weights).sum(axis=1).round(1)
+    rs_dict = rs.to_dict()
+    for r in rows:
+        v = rs_dict.get(r["ticker"])
+        r["rs"] = None if pd.isna(v) else float(v)
 
     rows.sort(key=lambda x: (x["rs"] is None, -(x["rs"] or 0)))
 
@@ -179,12 +119,12 @@ def main() -> int:
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "as_of": today,
         "count": len(rows),
-        "periods": list(PERIODS.keys()),
+        "periods": [p for p, _ in PERIODS],
         "rs_weights": RS_WEIGHTS,
         "rows": rows,
     }
     OUT_FILE.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    print(f"완료: {OUT_FILE} ({len(rows)}개 종목)", file=sys.stderr)
+    print(f"완료: {OUT_FILE} ({len(rows)}개)", file=sys.stderr)
     return 0
 
 
