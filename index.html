@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>KR RS Screener · 한국 주가상승률 스크리너</title>
 <style>
-  :root {
+  :root, [data-theme="dark"] {
     --bg: #0b0d10;
     --panel: #14171c;
     --panel-2: #1a1e25;
@@ -18,6 +18,32 @@
     --down: #4f9eff;
     --chip: #232833;
   }
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --panel: #f6f7f9;
+    --panel-2: #eceef2;
+    --border: #d6dae0;
+    --text: #1a1f29;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --gold: #b45309;
+    --up: #dc2626;
+    --down: #2563eb;
+    --chip: #e5e7eb;
+  }
+  [data-theme="green"] {
+    --bg: #061a0c;
+    --panel: #0c2516;
+    --panel-2: #133020;
+    --border: #1b4730;
+    --text: #d6f3da;
+    --muted: #79a385;
+    --accent: #4ade80;
+    --gold: #fbbf24;
+    --up: #fb7185;
+    --down: #60a5fa;
+    --chip: #163b25;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif; }
   a { color: var(--accent); text-decoration: none; }
@@ -27,6 +53,10 @@
   .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
   .basedate { color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; font-size: 12px; }
   .basedate b { color: var(--accent); }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .themebar { display: flex; gap: 4px; }
+  .theme-chip { background: var(--panel); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; cursor: pointer; user-select: none; }
+  .theme-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
   .glossary { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 12.5px; color: var(--muted); line-height: 1.75; }
   .glossary div { margin: 2px 0; }
@@ -92,7 +122,14 @@
       <h1>Relative-Strength Screener · KR</h1>
       <div class="sub">기간별 주가상승률 + 종합 RS 점수 · KOSPI / KOSDAQ</div>
     </div>
-    <div class="basedate" id="basedate">기준일 –</div>
+    <div class="header-right">
+      <div class="themebar" id="themebar">
+        <div class="theme-chip" data-theme="dark">🌙 다크</div>
+        <div class="theme-chip" data-theme="light">☀️ 화이트</div>
+        <div class="theme-chip" data-theme="green">🌿 그린</div>
+      </div>
+      <div class="basedate" id="basedate">기준일 –</div>
+    </div>
   </header>
 
   <div class="glossary">
@@ -486,6 +523,19 @@ document.getElementById("tb").addEventListener("click", (e) => {
   saveFavs();
   render();
 });
+
+// 테마 전환
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("kr_rs_theme", t);
+  document.querySelectorAll("#themebar .theme-chip").forEach(c => {
+    c.classList.toggle("active", c.dataset.theme === t);
+  });
+}
+document.querySelectorAll("#themebar .theme-chip").forEach(c => {
+  c.addEventListener("click", () => applyTheme(c.dataset.theme));
+});
+applyTheme(localStorage.getItem("kr_rs_theme") || "dark");
 
 load();
 </script>
