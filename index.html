@@ -5,58 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>KR RS Screener · 한국 주가상승률 스크리너</title>
 <style>
-  :root, [data-theme="dark"] {
-    --bg: #0b0d10;
-    --panel: #14171c;
-    --panel-2: #1a1e25;
-    --border: #262b34;
-    --text: #e6e8ec;
-    --muted: #8a92a3;
-    --accent: #6ea8ff;
-    --gold: #ffc857;
-    --up: #ff5b6e;
-    --down: #4f9eff;
-    --chip: #232833;
-  }
-  [data-theme="light"] {
-    --bg: #ffffff;
-    --panel: #f6f7f9;
-    --panel-2: #eceef2;
-    --border: #d6dae0;
-    --text: #1a1f29;
-    --muted: #6b7280;
-    --accent: #2563eb;
+  :root, [data-theme="light"] {
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --panel-2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --accent: #0ea5e9;
     --gold: #b45309;
     --up: #dc2626;
     --down: #2563eb;
-    --chip: #e5e7eb;
+    --chip: #f1f5f9;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #0b1220;
+    --panel: #121a2b;
+    --panel-2: #172033;
+    --border: #1f2a44;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --gold: #fcd34d;
+    --up: #f87171;
+    --down: #60a5fa;
+    --chip: #172033;
+    color-scheme: dark;
   }
   [data-theme="green"] {
-    --bg: #061a0c;
-    --panel: #0c2516;
-    --panel-2: #133020;
-    --border: #1b4730;
-    --text: #d6f3da;
-    --muted: #79a385;
-    --accent: #4ade80;
-    --gold: #fbbf24;
-    --up: #fb7185;
-    --down: #60a5fa;
-    --chip: #163b25;
+    --bg: #ecfdf5;
+    --panel: #ffffff;
+    --panel-2: #f0fdf4;
+    --border: #a7f3d0;
+    --text: #064e3b;
+    --muted: #047857;
+    --accent: #059669;
+    --gold: #92400e;
+    --up: #dc2626;
+    --down: #2563eb;
+    --chip: #d1fae5;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif; transition: background .15s ease, color .15s ease; }
   a { color: var(--accent); text-decoration: none; }
   .wrap { max-width: 1400px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
   h1 { font-size: 22px; margin: 0; }
   .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
   .basedate { color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; font-size: 12px; }
   .basedate b { color: var(--accent); }
   .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .themebar { display: flex; gap: 4px; }
-  .theme-chip { background: var(--panel); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; cursor: pointer; user-select: none; }
-  .theme-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .themebar { display: flex; gap: 3px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .theme-chip { background: transparent; color: var(--muted); border: none; border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; transition: all .12s ease; }
+  .theme-chip:hover { color: var(--text); }
+  .theme-chip.active { background: var(--accent); color: var(--bg); }
 
   .glossary { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 12.5px; color: var(--muted); line-height: 1.75; }
   .glossary div { margin: 2px 0; }
@@ -74,20 +78,18 @@
 
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: var(--chip); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; user-select: none; }
-  .chip.active { background: var(--accent); color: #0b0d10; border-color: var(--accent); }
+  .chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
   .tabbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .tab { background: var(--panel); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--muted); cursor: pointer; }
   .tab.active { color: var(--text); border-color: var(--accent); }
-  .tab.fav { color: var(--gold); border-color: var(--border); }
-  .tab.fav.active { background: var(--gold); color: #0b0d10; border-color: var(--gold); }
 
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .modebar .label, .periodbar .label { font-size: 11px; color: var(--muted); margin-right: 4px; }
-  .modebar .chip.active { background: #2d7dff; border-color: #2d7dff; color: #fff; }
-  .periodbar .chip.active { background: var(--gold); color: #0b0d10; border-color: var(--gold); }
+  .modebar .chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .periodbar .chip.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .chip.fav { color: var(--gold); margin-left: 8px; }
-  .chip.fav.active { background: var(--gold); color: #0b0d10; border-color: var(--gold); }
+  .chip.fav.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
 
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; min-width: 1280px; }
@@ -96,7 +98,7 @@
   thead th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border); }
   thead th .arrow { color: var(--accent); margin-left: 4px; font-size: 11px; }
   tbody tr { border-bottom: 1px solid var(--border); }
-  tbody tr:hover { background: rgba(110, 168, 255, 0.06); }
+  tbody tr:hover { background: var(--panel-2); }
   tbody td.ticker { color: var(--muted); font-variant-numeric: tabular-nums; }
   tbody td.name a { color: var(--text); }
   td.num { font-variant-numeric: tabular-nums; }
@@ -124,9 +126,9 @@
     </div>
     <div class="header-right">
       <div class="themebar" id="themebar">
-        <div class="theme-chip" data-theme="dark">🌙 다크</div>
-        <div class="theme-chip" data-theme="light">☀️ 화이트</div>
-        <div class="theme-chip" data-theme="green">🌿 그린</div>
+        <button class="theme-chip" data-theme="light">☀️ 화이트</button>
+        <button class="theme-chip" data-theme="dark">🌙 다크</button>
+        <button class="theme-chip" data-theme="green">🌿 그린</button>
       </div>
       <div class="basedate" id="basedate">기준일 –</div>
     </div>
@@ -259,46 +261,8 @@ const fmtScore = (v) => v == null ? "–" : v.toFixed(1);
 const fmtQuality = (v) => v == null ? "–" : v.toFixed(3);
 const fmtAccel = (v) => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2);
 
-const INLINE_FALLBACK = {
-  updated_at: "2026-06-01T19:00:00",
-  as_of: "20260601",
-  count: 5,
-  periods: ["1D","1W","1M","3M","6M","12M","YTD"],
-  rs_weights: {"1M":0.10,"3M":0.36,"6M":0.32,"12M":0.22},
-  rows: [
-    {ticker:"000660",name:"SK하이닉스",market:"KOSPI",sector:"반도체",price:215000,market_cap:0,
-     returns:{"1D":1.4,"1W":3.1,"1M":8.5,"3M":22.1,"6M":41.2,"12M":62.8,"YTD":35.0},
-     return_pct:{"1D":80,"1W":85,"1M":92,"3M":95,"6M":97,"12M":96,"YTD":93},
-     rs:95.1,quality:0.92,quality_pct:96,acceleration:6.2,acceleration_pct:88},
-    {ticker:"005930",name:"삼성전자",market:"KOSPI",sector:"반도체",price:82500,market_cap:0,
-     returns:{"1D":0.7,"1W":1.85,"1M":4.2,"3M":12.3,"6M":18.4,"12M":24.1,"YTD":15.2},
-     return_pct:{"1D":65,"1W":70,"1M":75,"3M":80,"6M":78,"12M":76,"YTD":74},
-     rs:78.4,quality:0.86,quality_pct:81,acceleration:3.4,acceleration_pct:72},
-    {ticker:"035420",name:"NAVER",market:"KOSPI",sector:"소프트웨어",price:198000,market_cap:0,
-     returns:{"1D":0.3,"1W":1.2,"1M":5.4,"3M":11.8,"6M":8.7,"12M":14.2,"YTD":9.1},
-     return_pct:{"1D":55,"1W":60,"1M":65,"3M":62,"6M":50,"12M":58,"YTD":55},
-     rs:62.8,quality:0.71,quality_pct:58,acceleration:1.2,acceleration_pct:48},
-    {ticker:"035720",name:"카카오",market:"KOSPI",sector:"소프트웨어",price:48200,market_cap:0,
-     returns:{"1D":-0.2,"1W":-0.5,"1M":-2.1,"3M":3.4,"6M":-1.2,"12M":-8.3,"YTD":-4.1},
-     return_pct:{"1D":40,"1W":35,"1M":28,"3M":40,"6M":30,"12M":22,"YTD":28},
-     rs:32.5,quality:0.42,quality_pct:25,acceleration:-2.1,acceleration_pct:22},
-    {ticker:"068270",name:"셀트리온",market:"KOSPI",sector:"제약/바이오",price:178000,market_cap:0,
-     returns:{"1D":-0.8,"1W":-1.2,"1M":-3.5,"3M":-8.2,"6M":-12.3,"12M":-15.4,"YTD":-7.8},
-     return_pct:{"1D":18,"1W":15,"1M":18,"3M":10,"6M":8,"12M":12,"YTD":15},
-     rs:18.2,quality:0.65,quality_pct:42,acceleration:-1.2,acceleration_pct:30}
-  ]
-};
-
 async function load() {
   const meta = document.getElementById("basedate");
-  if (location.protocol === "file:") {
-    state.data = INLINE_FALLBACK;
-    populateSectors();
-    const as = state.data.as_of;
-    meta.innerHTML = `로컬 미리보기 · 기준일 <b>${as.slice(0,4)}-${as.slice(4,6)}-${as.slice(6,8)}</b>`;
-    render();
-    return;
-  }
   try {
     const res = await fetch("data/stocks.json?ts=" + Date.now());
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -535,7 +499,7 @@ function applyTheme(t) {
 document.querySelectorAll("#themebar .theme-chip").forEach(c => {
   c.addEventListener("click", () => applyTheme(c.dataset.theme));
 });
-applyTheme(localStorage.getItem("kr_rs_theme") || "dark");
+applyTheme(localStorage.getItem("kr_rs_theme") || "light");
 
 load();
 </script>
