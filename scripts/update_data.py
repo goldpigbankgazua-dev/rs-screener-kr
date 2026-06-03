@@ -1,20 +1,19 @@
 """한국 주식 RS 스크리너 - 네이버 파이낸스 기반.
 
-FinanceDataReader 라이브러리가 한국 종목 일봉을 네이버 파이낸스에서 받아옵니다.
-종목 리스트는 data/tickers.json에서 로드.
+KOSPI/KOSDAQ 보통주 전 종목을 자동으로 수집:
+- 종목 리스트: FinanceDataReader.StockListing() (한국거래소 공시 데이터)
+- 일봉 가격: fdr.DataReader() — 내부적으로 네이버 파이낸스 API 사용
+- 우선주/스팩/리츠/ETF/ETN 제외, 보통주만
 
-산출 지표:
-- RS 점수 (1~99): 1M·3M·6M·12M 가중 백분위 (10/36/32/22), 1W·YTD 제외
-- 품질 (0~1): 최근 6개월 일봉 log가격 추세 직선성 R²
-- 가속 (%p): 최근 3M − 직전 3M 수익률
-- 기간 수익률: 1D, 1W, 1M, 3M, 6M, 12M, YTD
+산출 지표: RS, 품질(R²), 가속, 1D/1W/1M/3M/6M/12M/YTD 수익률
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -23,12 +22,77 @@ import pandas as pd
 import FinanceDataReader as fdr
 
 RS_WEIGHTS = {"1M": 0.10, "3M": 0.36, "6M": 0.32, "12M": 0.22}
-
 PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 31, "3M": 93, "6M": 186, "12M": 372}
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "data"
 OUT_FILE = OUT_DIR / "stocks.json"
 TICKERS_FILE = OUT_DIR / "tickers.json"
+
+# 보통주만: 다음 패턴 제외
+EXCLUDE_NAME_KEYWORDS = ("스팩", "리츠", "ETF", "ETN")
+# 우선주 패턴: ~우, ~우B, ~우C, ~2우B, ~3우B 등
+EXCLUDE_PREFERRED_REGEX = re.compile(r"\d?우[A-Z]?$")
+
+
+def is_common_stock(name: str) -> bool:
+    """보통주 True. 우선주/스팩/리츠/ETF/ETN/SPAC은 False."""
+    if not name:
+        return False
+    name = name.strip()
+    if any(k in name for k in EXCLUDE_NAME_KEYWORDS):
+        return False
+    if EXCLUDE_PREFERRED_REGEX.search(name):
+        return False
+    return True
+
+
+def fetch_universe_from_fdr() -> list[dict]:
+    """FinanceDataReader로 KOSPI+KOSDAQ 보통주 리스트 (시가총액 포함)."""
+    universe = []
+    for market in ("KOSPI", "KOSDAQ"):
+        try:
+            df = fdr.StockListing(market)
+        except Exception as e:
+            print(f"  {market} 리스팅 실패: {type(e).__name__}: {e}", file=sys.stderr)
+            continue
+        if df is None or df.empty:
+            print(f"  {market} 빈 리스팅", file=sys.stderr)
+            continue
+        code_col = next((c for c in ["Code", "Symbol"] if c in df.columns), None)
+        name_col = next((c for c in ["Name"] if c in df.columns), None)
+        marcap_col = next((c for c in ["Marcap", "MarketCap"] if c in df.columns), None)
+        sector_col = next((c for c in ["Sector", "Industry"] if c in df.columns), None)
+        if not code_col or not name_col:
+            print(f"  {market} 컬럼 인식 실패: {list(df.columns)[:10]}", file=sys.stderr)
+            continue
+        cnt_total, cnt_kept = len(df), 0
+        for _, row in df.iterrows():
+            code_raw = row[code_col]
+            name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
+            if not name or pd.isna(code_raw):
+                continue
+            code = str(code_raw).zfill(6)
+            if not is_common_stock(name):
+                continue
+            marcap = 0
+            if marcap_col and pd.notna(row.get(marcap_col)):
+                try:
+                    marcap = float(row[marcap_col])
+                except (ValueError, TypeError):
+                    marcap = 0
+            sector = ""
+            if sector_col and pd.notna(row.get(sector_col)):
+                sector = str(row[sector_col])
+            universe.append({
+                "ticker": code,
+                "name": name,
+                "market": market,
+                "sector": sector,
+                "market_cap": marcap,
+            })
+            cnt_kept += 1
+        print(f"  {market}: {cnt_total} → {cnt_kept} (보통주)", file=sys.stderr)
+    return universe
 
 
 def r_squared(prices) -> float | None:
@@ -53,51 +117,72 @@ def price_at_or_before(close: pd.Series, target: datetime) -> float | None:
     return float(eligible.iloc[-1]) if not eligible.empty else None
 
 
+def fetch_one_price(info: dict, start_date: str, end_date: str):
+    ticker = info["ticker"]
+    try:
+        df = fdr.DataReader(ticker, start_date, end_date)
+        if df is None or df.empty or "Close" not in df.columns:
+            return ticker, None
+        close = df["Close"].dropna()
+        if close.empty:
+            return ticker, None
+        return ticker, close
+    except Exception:
+        return ticker, None
+
+
 def main() -> int:
     today_dt = datetime.now()
 
-    print("[1/4] 종목 리스트 로드...", file=sys.stderr)
-    if not TICKERS_FILE.exists():
-        print(f"  ✗ {TICKERS_FILE} 없음", file=sys.stderr)
+    print("[1/4] 종목 리스트 수집...", file=sys.stderr)
+    universe = []
+    try:
+        universe = fetch_universe_from_fdr()
+        print(f"  -> FDR에서 {len(universe)}개 보통주", file=sys.stderr)
+    except Exception as e:
+        print(f"  FDR 전체 실패: {e}", file=sys.stderr)
+
+    if not universe and TICKERS_FILE.exists():
+        print("  -> data/tickers.json 폴백 사용", file=sys.stderr)
+        universe = json.loads(TICKERS_FILE.read_text(encoding="utf-8"))
+        # 폴백 데이터에도 보통주 필터 적용
+        universe = [u for u in universe if is_common_stock(u.get("name", ""))]
+
+    if not universe:
+        print("  ✗ 종목 리스트를 얻지 못함", file=sys.stderr)
         return 1
-    universe = json.loads(TICKERS_FILE.read_text(encoding="utf-8"))
-    # 중복 제거 (ticker 기준)
+
+    # 중복 제거
     seen = set()
-    unique = []
+    uniq = []
     for u in universe:
         if u["ticker"] not in seen:
             seen.add(u["ticker"])
-            unique.append(u)
-    universe = unique
-    print(f"  -> {len(universe)}개 종목", file=sys.stderr)
+            uniq.append(u)
+    universe = uniq
+    print(f"  -> 중복 제거 후 {len(universe)}개", file=sys.stderr)
 
     start_date = (today_dt - timedelta(days=400)).strftime("%Y-%m-%d")
     end_date = today_dt.strftime("%Y-%m-%d")
-    print(f"[2/4] 네이버 파이낸스 일봉 다운로드 (기간 {start_date} ~ {end_date})...", file=sys.stderr)
+    print(f"[2/4] 네이버 일봉 다운로드 (병렬, {start_date} ~ {end_date})...", file=sys.stderr)
 
     close_dict: dict[str, pd.Series] = {}
     fail = 0
-    for i, info in enumerate(universe, 1):
-        ticker = info["ticker"]
-        try:
-            df = fdr.DataReader(ticker, start_date, end_date)
-            if df is None or df.empty or "Close" not in df.columns:
-                fail += 1
-                if fail <= 3 or i % 20 == 0:
-                    print(f"  [{i}/{len(universe)}] {ticker} 빈 응답", file=sys.stderr)
-                continue
-            close = df["Close"].dropna()
-            if close.empty:
+    total = len(universe)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(fetch_one_price, u, start_date, end_date): u for u in universe}
+        for i, fut in enumerate(as_completed(futures), 1):
+            try:
+                ticker, close = fut.result(timeout=30)
+            except Exception:
                 fail += 1
                 continue
-            close_dict[ticker] = close
-            if i % 20 == 0:
-                print(f"  [{i}/{len(universe)}] OK (실패 누적 {fail})", file=sys.stderr)
-        except Exception as e:
-            fail += 1
-            if fail <= 3:
-                print(f"  [{i}/{len(universe)}] {ticker} 예외: {type(e).__name__}: {str(e)[:100]}", file=sys.stderr)
-        time.sleep(0.05)
+            if close is not None and not close.empty:
+                close_dict[ticker] = close
+            else:
+                fail += 1
+            if i % 200 == 0 or i == total:
+                print(f"  진행 {i}/{total} (성공 {len(close_dict)}, 실패 {fail})", file=sys.stderr)
 
     print(f"  -> 성공 {len(close_dict)}개 / 실패 {fail}개", file=sys.stderr)
     if not close_dict:
@@ -114,7 +199,7 @@ def main() -> int:
     info_map = {u["ticker"]: u for u in universe}
     rows: list[dict] = []
     for ticker, close in close_dict.items():
-        info = info_map[ticker]
+        info = info_map.get(ticker, {})
         try:
             last = float(close.iloc[-1])
             if last <= 0:
@@ -139,11 +224,11 @@ def main() -> int:
 
             rows.append({
                 "ticker": ticker,
-                "name": info["name"],
-                "market": info["market"],
+                "name": info.get("name", ticker),
+                "market": info.get("market", ""),
                 "sector": info.get("sector", ""),
                 "price": last,
-                "market_cap": 0,
+                "market_cap": info.get("market_cap", 0),
                 "returns": rets,
                 "rs": None,
                 "quality": quality,
@@ -152,8 +237,7 @@ def main() -> int:
                 "acceleration_pct": None,
                 "return_pct": {},
             })
-        except Exception as e:
-            print(f"  {ticker} 계산 실패: {type(e).__name__}: {e}", file=sys.stderr)
+        except Exception:
             continue
 
     if not rows:
