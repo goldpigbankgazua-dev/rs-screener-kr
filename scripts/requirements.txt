@@ -1,3 +1,2 @@
-pykrx
+pykrx>=1.0.45
 pandas>=2.0
-numpy>=1.24

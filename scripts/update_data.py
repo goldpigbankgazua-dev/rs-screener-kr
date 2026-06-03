@@ -47,16 +47,29 @@ def find_business_day(target: datetime, max_back: int = 15) -> str:
     print(f"  pykrx 버전: {getattr(pykrx, '__version__', 'unknown')}", file=sys.stderr)
     for i in range(max_back):
         d = (target - timedelta(days=i)).strftime("%Y%m%d")
-        try:
-            df = stock.get_market_ohlcv(d, market="KOSPI")
-            n = 0 if df is None or df.empty else len(df)
-            close_sum = 0 if df is None or df.empty else float(df["종가"].sum())
-            print(f"  [{d}] rows={n} close_sum={close_sum:.0f}", file=sys.stderr)
-            if df is not None and not df.empty and close_sum > 0:
-                return d
-        except Exception as e:
-            print(f"  [{d}] 예외: {type(e).__name__}: {e}", file=sys.stderr)
-        time.sleep(0.5)  # KRX 호출 사이 여유
+        for attempt in range(3):  # 재시도 3회
+            try:
+                df = stock.get_market_ohlcv(d, market="KOSPI")
+                cols = list(df.columns) if df is not None and not df.empty else []
+                n = 0 if df is None or df.empty else len(df)
+                if df is not None and not df.empty:
+                    # 컬럼명이 한글 또는 영어일 수 있음
+                    close_col = next((c for c in ["종가", "Close", "close"] if c in df.columns), None)
+                    if close_col:
+                        close_sum = float(df[close_col].sum())
+                        print(f"  [{d}] rows={n} cols={cols} close_sum={close_sum:.0f}", file=sys.stderr)
+                        if close_sum > 0:
+                            return d
+                    else:
+                        print(f"  [{d}] rows={n} cols={cols} (종가 컬럼 없음)", file=sys.stderr)
+                else:
+                    print(f"  [{d}] 빈 응답", file=sys.stderr)
+                break  # 정상 응답(빈 응답 포함)이면 재시도 안 함, 다음 날짜
+            except Exception as e:
+                msg = str(e)[:120]
+                print(f"  [{d}] 시도{attempt+1} 예외: {type(e).__name__}: {msg}", file=sys.stderr)
+                time.sleep(1.5)
+        time.sleep(0.5)
     raise RuntimeError("영업일을 찾지 못했습니다")
 
 
