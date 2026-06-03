@@ -41,16 +41,22 @@ OUT_DIR = Path(__file__).resolve().parents[1] / "data"
 OUT_FILE = OUT_DIR / "stocks.json"
 
 
-def find_business_day(target: datetime, max_back: int = 10) -> str:
+def find_business_day(target: datetime, max_back: int = 15) -> str:
     """target 또는 그 이전 가장 가까운 영업일 YYYYMMDD."""
+    import pykrx
+    print(f"  pykrx 버전: {getattr(pykrx, '__version__', 'unknown')}", file=sys.stderr)
     for i in range(max_back):
         d = (target - timedelta(days=i)).strftime("%Y%m%d")
         try:
             df = stock.get_market_ohlcv(d, market="KOSPI")
-            if df is not None and not df.empty and df["종가"].sum() > 0:
+            n = 0 if df is None or df.empty else len(df)
+            close_sum = 0 if df is None or df.empty else float(df["종가"].sum())
+            print(f"  [{d}] rows={n} close_sum={close_sum:.0f}", file=sys.stderr)
+            if df is not None and not df.empty and close_sum > 0:
                 return d
-        except Exception:
-            continue
+        except Exception as e:
+            print(f"  [{d}] 예외: {type(e).__name__}: {e}", file=sys.stderr)
+        time.sleep(0.5)  # KRX 호출 사이 여유
     raise RuntimeError("영업일을 찾지 못했습니다")
 
 
