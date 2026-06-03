@@ -56,6 +56,8 @@
   .modebar .label, .periodbar .label { font-size: 11px; color: var(--muted); margin-right: 4px; }
   .modebar .chip.active { background: #2d7dff; border-color: #2d7dff; color: #fff; }
   .periodbar .chip.active { background: var(--gold); color: #0b0d10; border-color: var(--gold); }
+  .chip.fav { color: var(--gold); margin-left: 8px; }
+  .chip.fav.active { background: var(--gold); color: #0b0d10; border-color: var(--gold); }
 
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; min-width: 1280px; }
@@ -104,8 +106,6 @@
     <div class="tab active" data-market="ALL">전체</div>
     <div class="tab" data-market="KOSPI">KOSPI</div>
     <div class="tab" data-market="KOSDAQ">KOSDAQ</div>
-    <div style="flex:1"></div>
-    <div class="tab fav" id="favOnly">⭐ 관심종목만</div>
   </div>
 
   <div class="modebar">
@@ -113,6 +113,7 @@
     <div class="chip active" data-mode="rs">RS</div>
     <div class="chip" data-mode="rsq">품질 (RS+품질)</div>
     <div class="chip" data-mode="rsqa">가속 (RS+품질+가속)</div>
+    <div class="chip fav" id="favOnly">⭐ 관심종목만</div>
   </div>
 
   <div class="periodbar">
@@ -439,9 +440,9 @@ document.getElementById("favOnly").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("active", state.favOnly);
   state.page = 1; render();
 });
-document.querySelectorAll(".modebar .chip").forEach(c => {
+document.querySelectorAll(".modebar .chip[data-mode]").forEach(c => {
   c.addEventListener("click", () => {
-    document.querySelectorAll(".modebar .chip").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".modebar .chip[data-mode]").forEach(x => x.classList.remove("active"));
     c.classList.add("active");
     state.mode = c.dataset.mode;
     state.sortKey = null;
