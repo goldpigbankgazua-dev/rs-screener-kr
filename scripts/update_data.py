@@ -46,8 +46,20 @@ def is_common_stock(name: str) -> bool:
     return True
 
 
+def load_sector_overrides() -> dict[str, str]:
+    """tickers.json의 섹터 정보를 백업 매핑으로 로드."""
+    if not TICKERS_FILE.exists():
+        return {}
+    try:
+        data = json.loads(TICKERS_FILE.read_text(encoding="utf-8"))
+        return {d["ticker"]: d.get("sector", "") for d in data if d.get("sector")}
+    except Exception:
+        return {}
+
+
 def fetch_universe_from_fdr() -> list[dict]:
-    """FinanceDataReader로 KOSPI+KOSDAQ 보통주 리스트 (시가총액 포함)."""
+    """FinanceDataReader로 KOSPI+KOSDAQ 보통주 리스트 (시가총액 + 섹터 포함)."""
+    sector_overrides = load_sector_overrides()
     universe = []
     for market in ("KOSPI", "KOSDAQ"):
         try:
@@ -58,12 +70,14 @@ def fetch_universe_from_fdr() -> list[dict]:
         if df is None or df.empty:
             print(f"  {market} 빈 리스팅", file=sys.stderr)
             continue
+        print(f"  {market} 컬럼: {list(df.columns)}", file=sys.stderr)
         code_col = next((c for c in ["Code", "Symbol"] if c in df.columns), None)
         name_col = next((c for c in ["Name"] if c in df.columns), None)
         marcap_col = next((c for c in ["Marcap", "MarketCap"] if c in df.columns), None)
-        sector_col = next((c for c in ["Sector", "Industry"] if c in df.columns), None)
+        # 섹터: 다양한 컬럼명 시도
+        sector_cols = [c for c in ["Sector", "Industry", "Department", "업종", "Dept"] if c in df.columns]
         if not code_col or not name_col:
-            print(f"  {market} 컬럼 인식 실패: {list(df.columns)[:10]}", file=sys.stderr)
+            print(f"  {market} 코드/이름 컬럼 인식 실패", file=sys.stderr)
             continue
         cnt_total, cnt_kept = len(df), 0
         for _, row in df.iterrows():
@@ -80,9 +94,15 @@ def fetch_universe_from_fdr() -> list[dict]:
                     marcap = float(row[marcap_col])
                 except (ValueError, TypeError):
                     marcap = 0
+            # 섹터: FDR 컬럼 중 첫 번째로 값이 있는 것 → 없으면 tickers.json 백업
             sector = ""
-            if sector_col and pd.notna(row.get(sector_col)):
-                sector = str(row[sector_col])
+            for sc in sector_cols:
+                v = row.get(sc)
+                if v is not None and pd.notna(v) and str(v).strip():
+                    sector = str(v).strip()
+                    break
+            if not sector and code in sector_overrides:
+                sector = sector_overrides[code]
             universe.append({
                 "ticker": code,
                 "name": name,
@@ -91,7 +111,8 @@ def fetch_universe_from_fdr() -> list[dict]:
                 "market_cap": marcap,
             })
             cnt_kept += 1
-        print(f"  {market}: {cnt_total} → {cnt_kept} (보통주)", file=sys.stderr)
+        with_sector = sum(1 for u in universe if u["market"] == market and u["sector"])
+        print(f"  {market}: {cnt_total} → {cnt_kept} (보통주, 섹터 보유 {with_sector})", file=sys.stderr)
     return universe
 
 
