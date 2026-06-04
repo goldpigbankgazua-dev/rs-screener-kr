@@ -2,7 +2,8 @@ name: Update RS data
 
 on:
   schedule:
-    - cron: "0 10 * * 1-5"
+    # KST 21:00 = UTC 12:00 (평일만)
+    - cron: "0 12 * * 1-5"
   workflow_dispatch: {}
 
 permissions:
