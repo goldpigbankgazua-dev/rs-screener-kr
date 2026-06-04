@@ -67,12 +67,20 @@
   .glossary b { color: var(--text); }
   .glossary code { color: var(--accent); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
-  .controls { display: grid; grid-template-columns: 1fr; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
-  @media (min-width: 720px) { .controls { grid-template-columns: 1.4fr 1fr 1fr 1fr; } }
+  .controls { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: end; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  /* 4개 컨트롤 동일 폭으로 균형 */
+  @media (min-width: 720px) { .controls { grid-template-columns: repeat(4, 1fr); } }
+  .control { display: flex; flex-direction: column; min-width: 0; }
   .control label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
   input[type="search"], select {
     width: 100%; background: var(--panel-2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0 10px; font-size: 13px; height: 36px; line-height: 1.2;
+    font-family: inherit; box-sizing: border-box;
+  }
+  select { padding-right: 26px; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5l5 5 5-5'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; background-size: 10px;
   }
   input[type="search"]::placeholder { color: var(--muted); }
 
@@ -193,12 +201,12 @@
     </div>
     <div class="control">
       <label>표시 개수</label>
-      <div class="chips" id="pagesize">
-        <div class="chip" data-size="50">50개</div>
-        <div class="chip active" data-size="100">100개</div>
-        <div class="chip" data-size="250">250개</div>
-        <div class="chip" data-size="999999">전체</div>
-      </div>
+      <select id="pagesize">
+        <option value="50">50개</option>
+        <option value="100" selected>100개</option>
+        <option value="250">250개</option>
+        <option value="999999">전체</option>
+      </select>
     </div>
   </div>
 
@@ -477,13 +485,9 @@ document.getElementById("clearPeriods").addEventListener("click", () => {
   document.querySelectorAll(".periodbar .chip[data-period]").forEach(x => x.classList.remove("active"));
   state.sortKey = null; state.page = 1; render();
 });
-document.querySelectorAll("#pagesize .chip").forEach(c => {
-  c.addEventListener("click", () => {
-    document.querySelectorAll("#pagesize .chip").forEach(x => x.classList.remove("active"));
-    c.classList.add("active");
-    state.pageSize = parseInt(c.dataset.size, 10);
-    state.page = 1; render();
-  });
+document.getElementById("pagesize").addEventListener("change", e => {
+  state.pageSize = parseInt(e.target.value, 10);
+  state.page = 1; render();
 });
 document.getElementById("q").addEventListener("input", e => { state.query = e.target.value; state.page = 1; render(); });
 document.getElementById("sector").addEventListener("change", e => { state.sector = e.target.value; state.page = 1; render(); });
