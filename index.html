@@ -92,14 +92,25 @@
   .chip.fav.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
 
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; min-width: 1280px; }
-  th, td { padding: 10px 10px; font-size: 13px; text-align: right; white-space: nowrap; }
-  th.l, td.l { text-align: left; }
+  table { width: 100%; border-collapse: collapse; min-width: 1340px; table-layout: fixed; }
+  th, td { padding: 10px 8px; font-size: 13px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 고정 컬럼 폭: 정렬 모드/기간 클릭 시 표가 흔들리지 않도록 */
+  col.c-star    { width: 36px; }
+  col.c-rank    { width: 48px; }
+  col.c-ticker  { width: 78px; }
+  col.c-name    { width: 200px; }
+  col.c-sector  { width: 120px; }
+  col.c-price   { width: 88px; }
+  col.c-cap     { width: 84px; }
+  col.c-period  { width: 70px; }
+  col.c-score   { width: 64px; }
+  col.c-comp    { width: 92px; }
+  td.name { text-align: left; overflow: hidden; text-overflow: ellipsis; }
   thead th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border); }
   thead th .arrow { color: var(--accent); margin-left: 4px; font-size: 11px; }
   tbody tr { border-bottom: 1px solid var(--border); }
   tbody tr:hover { background: var(--panel-2); }
-  tbody td.ticker { color: var(--muted); font-variant-numeric: tabular-nums; }
+  tbody td.ticker { color: var(--muted); font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
   tbody td.name a { color: var(--text); }
   td.num { font-variant-numeric: tabular-nums; }
   .up { color: var(--up); }
@@ -121,17 +132,10 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Relative-Strength Screener · KR</h1>
-      <div class="sub">기간별 주가상승률 + 종합 RS 점수 · KOSPI / KOSDAQ</div>
+      <h1>RS스크리너</h1>
+      <div class="sub">기간별 주가상승률 + 종합 점수 · KOSPI / KOSDAQ</div>
     </div>
-    <div class="header-right">
-      <div class="themebar" id="themebar">
-        <button class="theme-chip" data-theme="light">☀️ 화이트</button>
-        <button class="theme-chip" data-theme="dark">🌙 다크</button>
-        <button class="theme-chip" data-theme="green">🌿 그린</button>
-      </div>
-      <div class="basedate" id="basedate">기준일 –</div>
-    </div>
+    <div class="basedate" id="basedate">기준일 –</div>
   </header>
 
   <div class="glossary">
@@ -180,10 +184,11 @@
       <label>최소 시가총액 (억원)</label>
       <select id="mcap">
         <option value="0">제한 없음</option>
-        <option value="500">500억 이상</option>
         <option value="1000">1,000억 이상</option>
-        <option value="3000">3,000억 이상</option>
+        <option value="5000">5,000억 이상</option>
         <option value="10000">1조 이상</option>
+        <option value="50000">5조 이상</option>
+        <option value="100000">10조 이상</option>
       </select>
     </div>
     <div class="control">
@@ -199,13 +204,26 @@
 
   <div class="tablewrap">
     <table id="t">
+      <colgroup>
+        <col class="c-star"/>
+        <col class="c-rank"/>
+        <col class="c-ticker"/>
+        <col class="c-name"/>
+        <col class="c-sector"/>
+        <col class="c-price"/>
+        <col class="c-cap"/>
+        <col class="c-period"/><col class="c-period"/><col class="c-period"/>
+        <col class="c-period"/><col class="c-period"/><col class="c-period"/><col class="c-period"/>
+        <col class="c-score"/><col class="c-score"/><col class="c-score"/>
+        <col class="c-comp"/>
+      </colgroup>
       <thead>
         <tr>
-          <th style="width:36px">★</th>
-          <th class="l" style="width:50px">#</th>
-          <th class="l" data-sort="ticker">코드</th>
-          <th class="l" data-sort="name">종목명</th>
-          <th class="l" data-sort="sector">섹터</th>
+          <th>★</th>
+          <th>#</th>
+          <th data-sort="ticker">코드</th>
+          <th data-sort="name">종목명</th>
+          <th data-sort="sector">섹터</th>
           <th data-sort="price">현재가</th>
           <th data-sort="market_cap">시총(억)</th>
           <th data-sort="1D">1D</th>
@@ -218,7 +236,7 @@
           <th data-sort="rs">RS</th>
           <th data-sort="quality">품질</th>
           <th data-sort="acceleration">가속</th>
-          <th data-sort="composite" id="th-comp">종합</th>
+          <th data-sort="composite">종합점수</th>
         </tr>
       </thead>
       <tbody id="tb"></tbody>
@@ -350,12 +368,8 @@ function filtered() {
   return arr;
 }
 
-function compHeaderLabel() {
-  if (state.periods.size > 0) return `기간평균 (${[...state.periods].join("·")})`;
-  if (state.mode === "rs") return "RS";
-  if (state.mode === "rsq") return "RS+Q 평균";
-  return "RS+Q+A 평균";
-}
+// 종합점수 헤더는 항상 고정 — 표 폭이 흔들리지 않도록
+function compHeaderLabel() { return "종합점수"; }
 
 function render() {
   const tb = document.getElementById("tb");
@@ -370,7 +384,6 @@ function render() {
   document.getElementById("pageinfo").textContent = `${state.page} / ${pages} · ${total.toLocaleString()}개`;
   document.getElementById("prev").disabled = state.page <= 1;
   document.getElementById("next").disabled = state.page >= pages;
-  document.getElementById("th-comp").innerHTML = compHeaderLabel();
 
   tb.innerHTML = "";
   empty.hidden = page.length > 0;
@@ -396,11 +409,11 @@ function render() {
     const comp = displayComposite(r);
 
     tr.innerHTML =
-      `<td class="l"><span class="star ${isFav?'on':''}" data-ticker="${r.ticker}">${isFav?'★':'☆'}</span></td>` +
-      td(start + i + 1, "num l") +
-      td(r.ticker, "ticker l") +
-      td(`<a href="${naverUrl}" target="_blank" rel="noopener">${r.name}</a><span class="badge">${r.market}</span>`, "name l") +
-      td(r.sector || "–", "l") +
+      `<td><span class="star ${isFav?'on':''}" data-ticker="${r.ticker}">${isFav?'★':'☆'}</span></td>` +
+      td(start + i + 1, "num") +
+      td(r.ticker, "ticker") +
+      td(`<a href="${naverUrl}" target="_blank" rel="noopener">${r.name}</a><span class="badge">${r.market}</span>`, "name") +
+      td(r.sector || "–", "") +
       td(fmtPrice(r.price), "num") +
       td(fmtCapEok(r.market_cap), "num") +
       PERIODS_ALL.map(p => td(fmtPct(r.returns?.[p]), "num " + cls(r.returns?.[p]))).join("") +
@@ -488,18 +501,18 @@ document.getElementById("tb").addEventListener("click", (e) => {
   render();
 });
 
-// 테마 전환
+// ===== 테마: 허브 단일 컨트롤러에서 신호 받음 (postMessage + URL 파라미터) =====
+const THEMES = ["light", "dark", "green"];
 function applyTheme(t) {
+  if (!THEMES.includes(t)) t = "light";
   document.documentElement.setAttribute("data-theme", t);
   localStorage.setItem("kr_rs_theme", t);
-  document.querySelectorAll("#themebar .theme-chip").forEach(c => {
-    c.classList.toggle("active", c.dataset.theme === t);
-  });
 }
-document.querySelectorAll("#themebar .theme-chip").forEach(c => {
-  c.addEventListener("click", () => applyTheme(c.dataset.theme));
+const _urlTheme = new URLSearchParams(location.search).get("theme");
+applyTheme(_urlTheme || localStorage.getItem("kr_rs_theme") || "light");
+window.addEventListener("message", e => {
+  if (e.data && e.data.type === "yeobtoni-theme") applyTheme(e.data.value);
 });
-applyTheme(localStorage.getItem("kr_rs_theme") || "light");
 
 load();
 </script>
