@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>KR RS Screener · 한국 주가상승률 스크리너</title>
 <style>
   :root, [data-theme="light"] {
@@ -67,35 +70,38 @@
   .glossary b { color: var(--text); }
   .glossary code { color: var(--accent); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
-  /* ===== 까리한 플로팅 라벨 컨트롤 ===== */
+  /* ===== Linear/Vercel 스타일 인라인 필 컨트롤 ===== */
   .controls { display: grid; grid-template-columns: 1fr; gap: 8px; background: transparent; border: 0; padding: 0; margin-bottom: 10px; }
-  @media (min-width: 720px) { .controls { grid-template-columns: repeat(4, 1fr); gap: 10px; } }
+  @media (min-width: 720px) { .controls { grid-template-columns: 1.5fr 1fr 1.1fr 0.9fr; gap: 8px; } }
   .control {
-    position: relative;
-    display: flex; flex-direction: column; justify-content: center;
+    display: flex; align-items: stretch;
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 14px 8px 14px; min-width: 0; min-height: 54px;
+    overflow: hidden; height: 40px; min-width: 0;
     transition: border-color .12s ease, box-shadow .12s ease;
   }
+  .control:hover { border-color: var(--border-strong, var(--muted)); }
   .control:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .control label {
-    display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px;
-    font-weight: 600; letter-spacing: .01em; pointer-events: none;
+    display: flex; align-items: center; flex-shrink: 0;
+    padding: 0 12px; background: var(--panel-2);
+    border-right: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    white-space: nowrap; letter-spacing: -.005em; margin: 0; user-select: none;
   }
   .control input[type="search"], .control select {
-    width: 100%; background: transparent; color: var(--text);
-    border: 0; padding: 0; outline: none;
-    font: inherit; font-size: 14px; font-weight: 600; line-height: 1.25;
+    flex: 1; min-width: 0;
+    background: transparent; color: var(--text);
+    border: 0; padding: 0 12px; outline: none;
+    font: inherit; font-size: 13px; font-weight: 600; line-height: 40px;
     font-family: inherit; box-sizing: border-box;
-    height: auto; min-height: 20px;
   }
   .control select {
     appearance: none; -webkit-appearance: none; cursor: pointer;
-    padding-right: 18px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5l5 5 5-5'/></svg>");
-    background-repeat: no-repeat; background-position: right 0 center; background-size: 10px;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='none' stroke='%2394a3b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5l5 5 5-5'/></svg>");
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 10px;
   }
-  .control input[type="search"]::placeholder { color: var(--muted); font-weight: 500; }
+  .control input[type="search"]::placeholder { color: var(--muted); font-weight: 400; }
 
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: var(--chip); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; user-select: none; }
@@ -194,15 +200,15 @@
 
   <div class="controls">
     <div class="control">
-      <label>검색 (종목명 · 종목코드)</label>
-      <input id="q" type="search" placeholder="예: 삼성전자, 005930" autocomplete="off" />
+      <label>검색</label>
+      <input id="q" type="search" placeholder="종목명 · 종목코드" autocomplete="off" />
     </div>
     <div class="control">
       <label>섹터</label>
-      <select id="sector"><option value="">전체 섹터</option></select>
+      <select id="sector"><option value="">전체</option></select>
     </div>
     <div class="control">
-      <label>최소 시가총액 (억원)</label>
+      <label>시총</label>
       <select id="mcap">
         <option value="0">제한 없음</option>
         <option value="1000">1,000억 이상</option>
@@ -213,7 +219,7 @@
       </select>
     </div>
     <div class="control">
-      <label>표시 개수</label>
+      <label>표시</label>
       <select id="pagesize">
         <option value="50">50개</option>
         <option value="100" selected>100개</option>
