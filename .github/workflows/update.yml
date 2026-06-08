@@ -1,9 +1,9 @@
 name: Update RS data
 
 on:
-  schedule:
-    # KST 21:00 = UTC 12:00 (평일만)
-    - cron: "0 12 * * 1-5"
+  # Cron 비활성화: Oracle VM cron으로 이관됨 (~/rs/run.sh).
+  # GitHub Actions의 scheduled workflow는 신뢰성 부족(정시 미실행, 수시간 지연)으로
+  # 수동 백업용 workflow_dispatch만 유지.
   workflow_dispatch: {}
 
 permissions:
