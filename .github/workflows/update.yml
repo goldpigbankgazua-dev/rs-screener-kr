@@ -2,11 +2,11 @@ name: Update RS data
 
 on:
   schedule:
-    # KST 21:00 = UTC 12:00 (평일만)
+    # KST 18:00 = UTC 09:00 (평일만) — market 과 동일 시간대
     # 주의: GitHub Actions scheduled workflow는 정시 보장 안 됨 (수시간 지연 가능).
     # Oracle VM 으로 이관 시도했으나 VM 메모리 부족 (1GB) 으로 보류.
     # Ampere A1 capacity 잡히거나 유료 서버로 옮기면 다시 VM cron 으로 이관 예정.
-    - cron: "0 12 * * 1-5"
+    - cron: "0 9 * * 1-5"
   workflow_dispatch: {}
 
 permissions:
