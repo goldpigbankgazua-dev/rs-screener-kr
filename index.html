@@ -114,7 +114,7 @@
 
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: var(--chip); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; user-select: none; }
-  .chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
   .tabbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .tab { background: var(--panel); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--muted); cursor: pointer; }
@@ -122,10 +122,10 @@
 
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .modebar .label, .periodbar .label { font-size: 11px; color: var(--muted); margin-right: 4px; }
-  .modebar .chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-  .periodbar .chip.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+  .modebar .chip.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .periodbar .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
   .chip.fav { color: var(--gold); margin-left: 8px; }
-  .chip.fav.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+  .chip.fav.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; min-width: 1340px; table-layout: fixed; }
