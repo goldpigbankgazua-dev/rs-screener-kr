@@ -623,11 +623,100 @@ function computeSectorStats() {
   return out;
 }
 
+// RS 점수 → 색상 (스펙트럼/칩 공통)
+function rsToColor(rs) {
+  if (rs == null) return "var(--muted)";
+  const r = Math.max(17, Math.min(100, rs));
+  // 17 → hue 220 (blue), 100 → hue 0 (red)
+  const t = (r - 17) / (100 - 17);
+  const hue = (1 - t) * 220;
+  const sat = 80, light = 55;
+  return `hsl(${hue.toFixed(0)} ${sat}% ${light}%)`;
+}
+
+// RS 위치 → bar 내 left %
+function rsToLeftPct(rs) {
+  const r = Math.max(17, Math.min(100, rs));
+  return ((r - 17) / (100 - 17)) * 100;
+}
+
+// KOSPI / KOSDAQ 시장 종목들의 RS 중앙값 (지수 RS 대용)
+function indexRS(market) {
+  if (!state.data) return null;
+  const vs = state.data.rows.filter(r => r.market === market && r.rs != null).map(r => r.rs);
+  return median(vs);
+}
+
+function renderSpectrum(sectors) {
+  const stage = document.getElementById("spectrumStage");
+  const chips = document.getElementById("spectrumChips");
+  const count = document.getElementById("spectrumCount");
+  if (!stage || !chips) return;
+  stage.innerHTML = "";
+  chips.innerHTML = "";
+  count.textContent = `${sectors.length}개 섹터`;
+
+  // 배경 bar
+  const bar = document.createElement("div");
+  bar.className = "spectrum-bar";
+  stage.appendChild(bar);
+
+  // 섹터 dot (RS 위치, vertical stagger 로 겹침 방지)
+  const sorted = [...sectors].filter(s => s.rs_median != null).sort((a,b) => a.rs_median - b.rs_median);
+  // bucket 단위로 stagger
+  const buckets = {};
+  sorted.forEach(s => {
+    const b = Math.round(s.rs_median / 3);
+    buckets[b] = (buckets[b] || 0);
+    const idx = buckets[b]++;
+    const left = rsToLeftPct(s.rs_median);
+    const offsetY = ((idx % 6) - 2.5) * 11;  // -27.5 ~ +27.5px
+    const dot = document.createElement("div");
+    dot.className = "spec-dot";
+    dot.style.left = `calc(8px + ${left}% * (100% - 16px) / 100%)`;
+    dot.style.left = `calc((100% - 16px) * ${left/100} + 8px)`;
+    dot.style.top = `calc(50% + ${offsetY}px)`;
+    dot.style.background = rsToColor(s.rs_median);
+    dot.dataset.tip = `${s.name} ${Math.round(s.rs_median)} · ${s.count}종목`;
+    dot.dataset.sector = s.name;
+    stage.appendChild(dot);
+  });
+
+  // KOSPI / KOSDAQ 마커
+  const ksRs = indexRS("KOSPI");
+  const kqRs = indexRS("KOSDAQ");
+  function addIndex(label, rs, topPx) {
+    if (rs == null) return;
+    const left = rsToLeftPct(rs);
+    const ix = document.createElement("div");
+    ix.className = "spec-index";
+    ix.style.left = `calc((100% - 16px) * ${left/100} + 8px)`;
+    ix.style.top = topPx + "px";
+    ix.innerHTML = `<div class="spec-idx-label">${label} ${Math.round(rs)}</div><div class="spec-idx-line"></div>`;
+    stage.appendChild(ix);
+  }
+  // 위쪽: KOSPI / 아래쪽: KOSDAQ (서로 겹치지 않도록)
+  addIndex("KS", ksRs, 16);
+  addIndex("KQ", kqRs, 16);
+
+  // 하단 chip list (RS 내림차순)
+  const chipsSorted = [...sectors].filter(s => s.rs_median != null).sort((a,b) => b.rs_median - a.rs_median);
+  for (const s of chipsSorted) {
+    const c = document.createElement("button");
+    c.className = "spec-chip";
+    c.type = "button";
+    c.dataset.sector = s.name;
+    c.innerHTML = `<span class="spec-chip-bullet" style="background:${rsToColor(s.rs_median)}"></span><span>${s.name}</span><span class="spec-chip-val">${Math.round(s.rs_median)}</span>`;
+    chips.appendChild(c);
+  }
+}
+
 function renderSectors() {
   const tbs = document.getElementById("tbs");
   const emptyS = document.getElementById("emptyS");
   const arr = computeSectorStats();
   emptyS.hidden = arr.length > 0;
+  renderSpectrum(arr);
 
   // 정렬 화살표
   document.querySelectorAll("#ts thead th").forEach(th => {
@@ -806,16 +895,29 @@ document.querySelectorAll("#ts thead th").forEach(th => {
 document.querySelectorAll(".vt").forEach(b => {
   b.addEventListener("click", () => setView(b.dataset.view));
 });
-document.getElementById("tbs").addEventListener("click", (e) => {
-  const row = e.target.closest("tr.sector-row");
-  if (!row) return;
-  state.sector = row.dataset.sector;
+function jumpToSectorStocks(sector) {
+  state.sector = sector;
   const sel = document.getElementById("sector");
-  if (sel) sel.value = state.sector;
+  if (sel) sel.value = sector;
   state.view = "stocks";
   document.querySelectorAll(".vt").forEach(b => b.classList.toggle("active", b.dataset.view === "stocks"));
   state.page = 1;
   render();
+}
+document.getElementById("tbs").addEventListener("click", (e) => {
+  const row = e.target.closest("tr.sector-row");
+  if (!row) return;
+  jumpToSectorStocks(row.dataset.sector);
+});
+document.getElementById("spectrumStage").addEventListener("click", (e) => {
+  const d = e.target.closest(".spec-dot");
+  if (!d) return;
+  jumpToSectorStocks(d.dataset.sector);
+});
+document.getElementById("spectrumChips").addEventListener("click", (e) => {
+  const c = e.target.closest(".spec-chip");
+  if (!c) return;
+  jumpToSectorStocks(c.dataset.sector);
 });
 document.querySelectorAll(".tab[data-market]").forEach(t => {
   t.addEventListener("click", () => {
