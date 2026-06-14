@@ -127,6 +127,14 @@
   .chip.fav { color: var(--gold); margin-left: 8px; }
   .chip.fav.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
+  /* 다중선택된 컬럼 강조 — 옅은 배경 (chip 활성 + 표 컬럼) */
+  col.metric-selected,
+  th.metric-selected { background: rgba(255,255,255,.04); }
+  td.metric-selected { background: rgba(255,255,255,.025); }
+  [data-theme="light"] col.metric-selected,
+  [data-theme="light"] th.metric-selected { background: rgba(0,0,0,.04); }
+  [data-theme="light"] td.metric-selected { background: rgba(0,0,0,.025); }
+
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; min-width: 1340px; table-layout: fixed; }
   th, td { padding: 10px 8px; font-size: 13px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
