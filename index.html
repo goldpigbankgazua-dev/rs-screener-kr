@@ -134,6 +134,81 @@
   tr.sector-row { cursor: pointer; }
   tr.sector-row td.name { font-weight: 600; }
 
+  /* ===== 섹터 RS 스펙트럼 (Jay 풍 한눈에 보이는 섹터 RS) ===== */
+  .spectrum-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px 12px; margin-bottom: 12px; }
+  .spectrum-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .spectrum-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .spectrum-count { font-size: 12px; color: var(--muted); }
+  .spectrum-stage {
+    position: relative;
+    height: 110px;
+    padding: 0 8px;
+    margin: 4px 0 6px;
+  }
+  .spectrum-bar {
+    position: absolute; left: 8px; right: 8px; top: 50%; transform: translateY(-50%);
+    height: 8px; border-radius: 999px;
+    background: linear-gradient(to right,
+      hsl(220 80% 55%) 0%,
+      hsl(200 70% 55%) 20%,
+      hsl(45 90% 55%) 50%,
+      hsl(20 90% 55%) 75%,
+      hsl(0 85% 55%) 100%);
+    opacity: .85;
+  }
+  .spec-dot {
+    position: absolute; top: 50%;
+    width: 10px; height: 10px; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 1.5px solid var(--panel);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.15);
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .spec-dot:hover { transform: translate(-50%, -50%) scale(1.6); z-index: 5; box-shadow: 0 0 0 2px var(--text); }
+  .spec-dot[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -8px);
+    background: var(--text); color: var(--bg);
+    padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    white-space: nowrap; pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  }
+  .spec-index {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    pointer-events: none;
+  }
+  .spec-index .spec-idx-label {
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    line-height: 1.2;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .spec-index .spec-idx-line {
+    width: 2px; height: 28px;
+    background: var(--text);
+    margin-top: 2px;
+    opacity: .6;
+  }
+  .spectrum-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding: 0 8px; }
+  .spectrum-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 8px; }
+  .spec-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 10px;
+    font-size: 12px; cursor: pointer;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .spec-chip:hover { border-color: var(--text); }
+  .spec-chip .spec-chip-bullet { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .spec-chip .spec-chip-val { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+  @media (max-width: 720px) {
+    .spectrum-stage { height: 90px; }
+    .spec-dot { width: 9px; height: 9px; }
+  }
+
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .modebar .label, .periodbar .label { font-size: 11px; color: var(--muted); margin-right: 4px; }
   .modebar .chip.active { background: var(--text); border-color: var(--text); color: var(--bg); }
