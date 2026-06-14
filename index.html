@@ -378,7 +378,9 @@ function multiSelectScore(r) {
     const x = state.ranks[m]?.[r.ticker];
     if (x != null) v.push(x);
   }
-  return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null;
+  // 선택된 지표 중 과반 이상 데이터 있어야 점수 인정 (적은 지표만 있으면 노이즈/공평하지 않음)
+  if (v.length < Math.ceil(sel.length / 2)) return null;
+  return v.reduce((s,x)=>s+x,0) / v.length;
 }
 
 function sortValue(r) {
