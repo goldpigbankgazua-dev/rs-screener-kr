@@ -673,7 +673,6 @@ function renderSpectrum(sectors) {
     const offsetY = ((idx % 6) - 2.5) * 11;  // -27.5 ~ +27.5px
     const dot = document.createElement("div");
     dot.className = "spec-dot";
-    dot.style.left = `calc(8px + ${left}% * (100% - 16px) / 100%)`;
     dot.style.left = `calc((100% - 16px) * ${left/100} + 8px)`;
     dot.style.top = `calc(50% + ${offsetY}px)`;
     dot.style.background = rsToColor(s.rs_median);
@@ -685,19 +684,29 @@ function renderSpectrum(sectors) {
   // KOSPI / KOSDAQ 마커
   const ksRs = indexRS("KOSPI");
   const kqRs = indexRS("KOSDAQ");
-  function addIndex(label, rs, topPx) {
+  function addIndex(label, rs, topPx, lineDir) {
     if (rs == null) return;
     const left = rsToLeftPct(rs);
     const ix = document.createElement("div");
     ix.className = "spec-index";
     ix.style.left = `calc((100% - 16px) * ${left/100} + 8px)`;
     ix.style.top = topPx + "px";
-    ix.innerHTML = `<div class="spec-idx-label">${label} ${Math.round(rs)}</div><div class="spec-idx-line"></div>`;
+    const lineHtml = `<div class="spec-idx-line"></div>`;
+    ix.innerHTML = lineDir === "up"
+      ? lineHtml + `<div class="spec-idx-label">${label} ${Math.round(rs)}</div>`
+      : `<div class="spec-idx-label">${label} ${Math.round(rs)}</div>` + lineHtml;
+    if (lineDir === "up") ix.style.flexDirection = "column-reverse";
     stage.appendChild(ix);
   }
-  // 위쪽: KOSPI / 아래쪽: KOSDAQ (서로 겹치지 않도록)
-  addIndex("KS", ksRs, 16);
-  addIndex("KQ", kqRs, 16);
+  // 둘이 가까우면 한쪽 위 / 한쪽 아래
+  const close = (ksRs != null && kqRs != null && Math.abs(ksRs - kqRs) < 10);
+  if (close) {
+    addIndex("KS", ksRs, 10, "down");
+    addIndex("KQ", kqRs, 70, "up");
+  } else {
+    addIndex("KS", ksRs, 10, "down");
+    addIndex("KQ", kqRs, 10, "down");
+  }
 
   // 하단 chip list (RS 내림차순)
   const chipsSorted = [...sectors].filter(s => s.rs_median != null).sort((a,b) => b.rs_median - a.rs_median);
