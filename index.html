@@ -437,14 +437,22 @@ function render() {
     }
   });
 
+  // 선택된 지표 column 강조 (옅은 배경)
+  document.querySelectorAll("th[data-metric], col[data-metric]").forEach(el => {
+    el.classList.toggle("metric-selected", state.metrics.has(el.dataset.metric));
+  });
+
   const frag = document.createDocumentFragment();
   page.forEach((r, i) => {
     const tr = document.createElement("tr");
     const cls = (v) => v == null ? "" : v >= 0 ? "up" : "down";
     const td = (html, klass = "") => `<td class="${klass}">${html}</td>`;
+    const tdM = (html, metric, klass = "") => {
+      const sel = state.metrics.has(metric) ? " metric-selected" : "";
+      return `<td class="${klass}${sel}">${html}</td>`;
+    };
     const naverUrl = `https://finance.naver.com/item/main.naver?code=${r.ticker}`;
     const isFav = state.favs.has(r.ticker);
-    const comp = displayComposite(r);
 
     tr.innerHTML =
       `<td><span class="star ${isFav?'on':''}" data-ticker="${r.ticker}">${isFav?'★':'☆'}</span></td>` +
@@ -454,11 +462,10 @@ function render() {
       td(r.sector || "–", "") +
       td(fmtPrice(r.price), "num") +
       td(fmtCapEok(r.market_cap), "num") +
-      PERIODS_ALL.map(p => td(fmtPct(r.returns?.[p]), "num " + cls(r.returns?.[p]))).join("") +
-      td(fmtScore(r.rs), "num rs") +
-      td(fmtQuality(r.quality), "num") +
-      td(fmtAccel(r.acceleration), "num " + cls(r.acceleration)) +
-      td(fmtScore(comp), "num comp");
+      PERIODS_ALL.map(p => tdM(fmtPct(r.returns?.[p]), p, "num " + cls(r.returns?.[p]))).join("") +
+      tdM(fmtScore(r.rs), "rs", "num rs") +
+      tdM(fmtQuality(r.quality), "quality", "num") +
+      tdM(fmtAccel(r.acceleration), "acceleration", "num " + cls(r.acceleration));
     frag.appendChild(tr);
   });
   tb.appendChild(frag);
@@ -492,26 +499,18 @@ document.getElementById("favOnly").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("active", state.favOnly);
   state.page = 1; render();
 });
-document.querySelectorAll(".modebar .chip[data-mode]").forEach(c => {
+document.querySelectorAll(".periodbar .chip[data-metric]").forEach(c => {
   c.addEventListener("click", () => {
-    document.querySelectorAll(".modebar .chip[data-mode]").forEach(x => x.classList.remove("active"));
-    c.classList.add("active");
-    state.mode = c.dataset.mode;
-    state.sortKey = null;
-    state.page = 1; render();
-  });
-});
-document.querySelectorAll(".periodbar .chip[data-period]").forEach(c => {
-  c.addEventListener("click", () => {
-    const p = c.dataset.period;
-    if (state.periods.has(p)) { state.periods.delete(p); c.classList.remove("active"); }
-    else { state.periods.add(p); c.classList.add("active"); }
-    state.sortKey = null;
+    const m = c.dataset.metric;
+    if (state.metrics.has(m)) { state.metrics.delete(m); c.classList.remove("active"); }
+    else { state.metrics.add(m); c.classList.add("active"); }
+    state.sortKey = null;  // 다중선택 시 자동으로 평균 점수 정렬 (높은 순)
+    state.sortDir = -1;
     state.page = 1; render();
   });
 });
 document.getElementById("clearPeriods").addEventListener("click", () => {
-  state.periods.clear();
+  state.metrics.clear();
   document.querySelectorAll(".periodbar .chip[data-period]").forEach(x => x.classList.remove("active"));
   state.sortKey = null; state.page = 1; render();
 });
