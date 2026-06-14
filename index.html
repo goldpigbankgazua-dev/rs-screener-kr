@@ -243,10 +243,15 @@
         <col class="c-sector"/>
         <col class="c-price"/>
         <col class="c-cap"/>
-        <col class="c-period"/><col class="c-period"/><col class="c-period"/>
-        <col class="c-period"/><col class="c-period"/><col class="c-period"/><col class="c-period"/>
-        <col class="c-score"/><col class="c-score"/><col class="c-score"/>
-        <col class="c-comp"/>
+        <col class="c-period" data-metric="1W"/>
+        <col class="c-period" data-metric="1M"/>
+        <col class="c-period" data-metric="3M"/>
+        <col class="c-period" data-metric="6M"/>
+        <col class="c-period" data-metric="12M"/>
+        <col class="c-period" data-metric="YTD"/>
+        <col class="c-score" data-metric="rs"/>
+        <col class="c-score" data-metric="quality"/>
+        <col class="c-score" data-metric="acceleration"/>
       </colgroup>
       <thead>
         <tr>
@@ -257,17 +262,15 @@
           <th data-sort="sector">섹터</th>
           <th data-sort="price">현재가</th>
           <th data-sort="market_cap">시총(억)</th>
-          <th data-sort="1D">1D</th>
-          <th data-sort="1W">1W</th>
-          <th data-sort="1M">1M</th>
-          <th data-sort="3M">3M</th>
-          <th data-sort="6M">6M</th>
-          <th data-sort="12M">12M</th>
-          <th data-sort="YTD">YTD</th>
-          <th data-sort="rs">RS</th>
-          <th data-sort="quality">품질</th>
-          <th data-sort="acceleration">가속</th>
-          <th data-sort="composite">종합점수</th>
+          <th data-sort="1W" data-metric="1W">1W</th>
+          <th data-sort="1M" data-metric="1M">1M</th>
+          <th data-sort="3M" data-metric="3M">3M</th>
+          <th data-sort="6M" data-metric="6M">6M</th>
+          <th data-sort="12M" data-metric="12M">12M</th>
+          <th data-sort="YTD" data-metric="YTD">YTD</th>
+          <th data-sort="rs" data-metric="rs">RS</th>
+          <th data-sort="quality" data-metric="quality">품질</th>
+          <th data-sort="acceleration" data-metric="acceleration">가속 (%p)</th>
         </tr>
       </thead>
       <tbody id="tb"></tbody>
@@ -296,13 +299,14 @@ const state = {
   sortDir: -1,
   pageSize: 100,
   page: 1,
-  mode: "rs",
-  periods: new Set(),
+  metrics: new Set(),    // 다중선택: 1W/1M/3M/6M/12M/YTD/rs/quality/acceleration
   favOnly: false,
   favs: new Set(JSON.parse(localStorage.getItem("kr_rs_favs") || "[]")),
+  ranks: null,           // {metric: {ticker: rank0to1}} 백분위 캐시
 };
 
-const PERIODS_ALL = ["1D", "1W", "1M", "3M", "6M", "12M", "YTD"];
+const PERIODS_ALL = ["1W", "1M", "3M", "6M", "12M", "YTD"];
+const ALL_METRICS = [...PERIODS_ALL, "rs", "quality", "acceleration"];
 const fmtPct = (v) => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2) + "%";
 const fmtPrice = (v) => v == null ? "–" : v.toLocaleString("ko-KR");
 const fmtCapEok = (v) => v == null || v === 0 ? "–" : Math.round(v / 1e8).toLocaleString("ko-KR");
