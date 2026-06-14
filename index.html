@@ -399,11 +399,10 @@ function filtered() {
     if (state.sector && r.sector !== state.sector) return false;
     if (minCap > 0 && (r.market_cap || 0) < minCap) return false;
     if (q && !(r.name.toLowerCase().includes(q) || r.ticker.includes(q))) return false;
+    // RS 점수 계산 불가능 (1M/3M/6M/12M 데이터 부족 — 신규상장/거래정지) 종목 제외
+    if (r.rs == null) return false;
     return true;
   });
-
-  // 점수 계산 불가능한 종목 (선택된 지표 모두 null) 제외 — 표시도 안 함
-  arr = arr.filter(r => sortValue(r) != null);
 
   const dir = state.sortDir;
   arr.sort((a, b) => {
