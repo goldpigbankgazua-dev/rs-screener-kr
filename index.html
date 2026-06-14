@@ -127,6 +127,11 @@
   .chip.fav { color: var(--gold); margin-left: 8px; }
   .chip.fav.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
+  /* 선택된 지표 요약 (chip 아래) */
+  .metrics-summary { font-size: 11.5px; color: var(--muted); margin: 4px 4px 10px;
+    line-height: 1.5; }
+  .metrics-summary b { color: var(--text); font-weight: 700; }
+
   /* 다중선택된 컬럼 강조 — 옅은 배경 (chip 활성 + 표 컬럼) */
   col.metric-selected,
   th.metric-selected { background: rgba(255,255,255,.04); }
@@ -455,6 +460,18 @@ function render() {
   document.querySelectorAll("th[data-metric], col[data-metric]").forEach(el => {
     el.classList.toggle("metric-selected", state.metrics.has(el.dataset.metric));
   });
+
+  // 선택된 지표 요약 (chip 아래 작은 설명글)
+  const summaryEl = document.getElementById("metricsSummary");
+  if (summaryEl) {
+    const LABELS = {"1W":"1주","1M":"1개월","3M":"3개월","6M":"6개월","12M":"12개월","YTD":"YTD","rs":"RS점수","quality":"품질","acceleration":"가속"};
+    const sel = state.metrics.size > 0 ? [...state.metrics] : ["rs"];
+    const names = sel.map(m => LABELS[m] || m);
+    const isDefault = state.metrics.size === 0;
+    summaryEl.innerHTML = isDefault
+      ? `복합 강도순 ▼ · <b>RS점수</b> 단일 지표 정렬 (다중선택 시 평균)`
+      : `복합 강도순 ▼ · <b>${names.join(" + ")}</b> ${sel.length}개 지표의 시장 내 순위 평균`;
+  }
 
   const frag = document.createDocumentFragment();
   page.forEach((r, i) => {
