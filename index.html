@@ -604,7 +604,7 @@ function computeSectorStats() {
     const rsList = items.map(r => r.rs).filter(v => v != null);
     const topCount = rsList.filter(v => v >= 80).length;
     const periodMed = {};
-    for (const p of ["1M","3M","6M","12M"]) {
+    for (const p of ["1W","1M","3M","6M","12M","YTD"]) {
       periodMed[p] = median(items.map(r => r.returns?.[p]).filter(v => v != null));
     }
     out.push({
@@ -612,8 +612,8 @@ function computeSectorStats() {
       count: items.length,
       rs_median: median(rsList),
       top_pct: rsList.length > 0 ? topCount / rsList.length : 0,
-      "1M": periodMed["1M"], "3M": periodMed["3M"],
-      "6M": periodMed["6M"], "12M": periodMed["12M"],
+      "1W": periodMed["1W"], "1M": periodMed["1M"], "3M": periodMed["3M"],
+      "6M": periodMed["6M"], "12M": periodMed["12M"], "YTD": periodMed["YTD"],
     });
   }
   // 정렬
