@@ -187,24 +187,19 @@
     <div class="tab" data-market="KOSDAQ">KOSDAQ</div>
   </div>
 
-  <div class="modebar">
-    <span class="label">정렬 모드:</span>
-    <div class="chip active" data-mode="rs">RS</div>
-    <div class="chip" data-mode="rsq">품질 (RS+품질)</div>
-    <div class="chip" data-mode="rsqa">가속 (RS+품질+가속)</div>
-    <div class="chip fav" id="favOnly">⭐ 관심종목만</div>
-  </div>
-
   <div class="periodbar">
-    <span class="label">기간 다중선택 (시장 내 순위 평균으로 정렬):</span>
-    <div class="chip" data-period="1D">1D</div>
-    <div class="chip" data-period="1W">1W</div>
-    <div class="chip" data-period="1M">1M</div>
-    <div class="chip" data-period="3M">3M</div>
-    <div class="chip" data-period="6M">6M</div>
-    <div class="chip" data-period="12M">12M</div>
-    <div class="chip" data-period="YTD">YTD</div>
+    <span class="label">다중선택 (선택한 지표의 시장 내 순위 평균으로 자동 정렬):</span>
+    <div class="chip" data-metric="1W">1W</div>
+    <div class="chip" data-metric="1M">1M</div>
+    <div class="chip" data-metric="3M">3M</div>
+    <div class="chip" data-metric="6M">6M</div>
+    <div class="chip" data-metric="12M">12M</div>
+    <div class="chip" data-metric="YTD">YTD</div>
+    <div class="chip" data-metric="rs">RS</div>
+    <div class="chip" data-metric="quality">품질</div>
+    <div class="chip" data-metric="acceleration">가속</div>
     <div class="chip" id="clearPeriods" style="margin-left:8px;color:var(--muted)">해제</div>
+    <div class="chip fav" id="favOnly" style="margin-left:8px;">⭐ 관심종목만</div>
   </div>
 
   <div class="controls">
