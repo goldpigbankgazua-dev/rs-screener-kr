@@ -58,9 +58,29 @@ def load_sector_overrides() -> dict[str, str]:
         return {}
 
 
+def load_wics_map() -> dict[str, str]:
+    """wics_map.json (ticker -> WICS 중분류). 섹터 1순위 출처."""
+    if not WICS_FILE.exists():
+        return {}
+    try:
+        return {k: v for k, v in json.loads(WICS_FILE.read_text(encoding="utf-8")).items() if v}
+    except Exception:
+        return {}
+
+
+# FDR이 KOSDAQ에 대해 섹터 컬럼에 넣어주는 '소속부'(섹터 아님) — 섹터로 쓰면 안 됨.
+SOSOKBU = {"우량기업부", "중견기업부", "벤처기업부", "기술성장기업부"}
+
+
+def _is_garbage_sector(s: str) -> bool:
+    s = (s or "").strip()
+    return (not s) or (s in SOSOKBU) or ("소속부" in s)
+
+
 def fetch_universe_from_fdr() -> list[dict]:
     """FinanceDataReader로 KOSPI+KOSDAQ 보통주 리스트 (시가총액 + 섹터 포함)."""
     sector_overrides = load_sector_overrides()
+    wics_map = load_wics_map()
     universe = []
     for market in ("KOSPI", "KOSDAQ"):
         try:
@@ -75,8 +95,8 @@ def fetch_universe_from_fdr() -> list[dict]:
         code_col = next((c for c in ["Code", "Symbol"] if c in df.columns), None)
         name_col = next((c for c in ["Name"] if c in df.columns), None)
         marcap_col = next((c for c in ["Marcap", "MarketCap"] if c in df.columns), None)
-        # 섹터: 다양한 컬럼명 시도
-        sector_cols = [c for c in ["Sector", "Industry", "Department", "업종", "Dept"] if c in df.columns]
+        # 섹터: 실제 업종 컬럼만. Department/Dept는 KOSDAQ '소속부'라 제외.
+        sector_cols = [c for c in ["Sector", "Industry", "업종"] if c in df.columns]
         if not code_col or not name_col:
             print(f"  {market} 코드/이름 컬럼 인식 실패", file=sys.stderr)
             continue
@@ -95,13 +115,14 @@ def fetch_universe_from_fdr() -> list[dict]:
                     marcap = float(row[marcap_col])
                 except (ValueError, TypeError):
                     marcap = 0
-            # 섹터: FDR 컬럼 중 첫 번째로 값이 있는 것 → 없으면 tickers.json 백업
-            sector = ""
-            for sc in sector_cols:
-                v = row.get(sc)
-                if v is not None and pd.notna(v) and str(v).strip():
-                    sector = str(v).strip()
-                    break
+            # 섹터 우선순위: WICS 맵(1순위) → FDR 업종(소속부 아닌 것) → tickers.json 백업
+            sector = wics_map.get(code, "")
+            if not sector:
+                for sc in sector_cols:
+                    v = row.get(sc)
+                    if v is not None and pd.notna(v) and not _is_garbage_sector(str(v)):
+                        sector = str(v).strip()
+                        break
             if not sector and code in sector_overrides:
                 sector = sector_overrides[code]
             universe.append({
