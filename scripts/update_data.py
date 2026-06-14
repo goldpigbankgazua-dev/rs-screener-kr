@@ -1,11 +1,11 @@
-"""한국 주식 RS 스크리너 - 네이버 파이낸스 기반.
+"""한국 주식 RS 스크리너 - KRX 공식 데이터 기반 (배당 제외 분할조정).
 
 KOSPI/KOSDAQ 보통주 전 종목을 자동으로 수집:
 - 종목 리스트: FinanceDataReader.StockListing() (한국거래소 공시 데이터)
-- 일봉 가격: fdr.DataReader() — 내부적으로 네이버 파이낸스 API 사용
+- 일봉 가격: pykrx.stock.get_market_ohlcv_by_date(adjusted=True) — KRX 공식, 분할조정만 (배당 제외)
 - 우선주/스팩/리츠/ETF/ETN 제외, 보통주만
 
-산출 지표: RS, 품질(R²), 가속, 1D/1W/1M/3M/6M/12M/YTD 수익률
+산출 지표: RS, 품질(R²), 가속, 1W/1M/3M/6M/12M/YTD 수익률 (배당 제외 — RS 표준)
 """
 
 from __future__ import annotations
@@ -17,9 +17,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import time
+
 import numpy as np
 import pandas as pd
 import FinanceDataReader as fdr
+from pykrx import stock as krx_stock
 
 RS_WEIGHTS = {"1M": 0.10, "3M": 0.36, "6M": 0.32, "12M": 0.22}
 PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 31, "3M": 93, "6M": 186, "12M": 372}
@@ -161,14 +164,20 @@ def price_at_or_before(close: pd.Series, target: datetime) -> float | None:
 
 
 def fetch_one_price(info: dict, start_date: str, end_date: str):
+    """pykrx 로 분할조정 일봉 fetch (배당 제외). RS 표준 가격."""
     ticker = info["ticker"]
     try:
-        df = fdr.DataReader(ticker, start_date, end_date)
-        if df is None or df.empty or "Close" not in df.columns:
+        # YYYY-MM-DD → YYYYMMDD (pykrx 포맷)
+        start = start_date.replace("-", "")
+        end = end_date.replace("-", "")
+        df = krx_stock.get_market_ohlcv_by_date(start, end, ticker, adjusted=True)
+        if df is None or df.empty or "종가" not in df.columns:
             return ticker, None
-        close = df["Close"].dropna()
+        close = df["종가"].dropna()
         if close.empty:
             return ticker, None
+        # KRX rate-limit 회피
+        time.sleep(0.05)
         return ticker, close
     except Exception:
         return ticker, None
