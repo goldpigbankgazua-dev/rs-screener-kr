@@ -171,13 +171,13 @@ def fetch_one_price(info: dict, start_date: str, end_date: str):
         start = start_date.replace("-", "")
         end = end_date.replace("-", "")
         df = krx_stock.get_market_ohlcv_by_date(start, end, ticker, adjusted=True)
+        # KRX rate-limit 회피 — 200ms (병렬 호출 시 차단 방지)
+        time.sleep(0.2)
         if df is None or df.empty or "종가" not in df.columns:
             return ticker, None
         close = df["종가"].dropna()
         if close.empty:
             return ticker, None
-        # KRX rate-limit 회피
-        time.sleep(0.05)
         return ticker, close
     except Exception:
         return ticker, None
@@ -216,12 +216,13 @@ def main() -> int:
 
     start_date = (today_dt - timedelta(days=400)).strftime("%Y-%m-%d")
     end_date = today_dt.strftime("%Y-%m-%d")
-    print(f"[2/4] 네이버 일봉 다운로드 (병렬, {start_date} ~ {end_date})...", file=sys.stderr)
+    print(f"[2/4] KRX 일봉 다운로드 (pykrx, 분할조정·배당제외, {start_date} ~ {end_date})...", file=sys.stderr)
 
     close_dict: dict[str, pd.Series] = {}
     fail = 0
     total = len(universe)
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    # KRX rate-limit 강함 → 병렬도 줄임 (3 thread)
+    with ThreadPoolExecutor(max_workers=3) as ex:
         futures = {ex.submit(fetch_one_price, u, start_date, end_date): u for u in universe}
         for i, fut in enumerate(as_completed(futures), 1):
             try:
