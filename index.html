@@ -354,12 +354,15 @@
 <script>
 const state = {
   data: null,
+  view: "stocks",        // "stocks" | "sectors"
   market: "ALL",
   sector: "",
   query: "",
   mcap: 0,
   sortKey: null,
   sortDir: -1,
+  sortKeyS: "rs_median", // 섹터 view 정렬 키 (기본 RS 중앙값)
+  sortDirS: -1,
   pageSize: 100,
   page: 1,
   metrics: new Set(),    // 다중선택: 1W/1M/3M/6M/12M/YTD/rs/quality/acceleration
@@ -477,7 +480,138 @@ function filtered() {
 // 종합점수 헤더는 항상 고정 — 표 폭이 흔들리지 않도록
 function compHeaderLabel() { return "종합점수"; }
 
+// ===== 섹터 집계 =====
+function median(arr) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a,b) => a-b);
+  const n = s.length;
+  return n % 2 ? s[(n-1)/2] : (s[n/2-1] + s[n/2]) / 2;
+}
+
+function computeSectorStats() {
+  if (!state.data) return [];
+  const minCap = state.mcap * 1e8;
+  const q = state.query.trim().toLowerCase();
+  // 종목 view 와 동일한 시장/시총/검색 필터 적용 (섹터 select 제외)
+  const rows = state.data.rows.filter(r => {
+    if (r.rs == null) return false;
+    if (!r.sector) return false;
+    if (state.market !== "ALL" && r.market !== state.market) return false;
+    if (minCap > 0 && (r.market_cap || 0) < minCap) return false;
+    if (q && !(r.name.toLowerCase().includes(q) || r.ticker.includes(q))) return false;
+    return true;
+  });
+  const groups = {};
+  for (const r of rows) {
+    (groups[r.sector] = groups[r.sector] || []).push(r);
+  }
+  const out = [];
+  for (const [name, items] of Object.entries(groups)) {
+    if (items.length < 3) continue;  // 종목수 < 3 섹터 제외
+    const rsList = items.map(r => r.rs).filter(v => v != null);
+    const topCount = rsList.filter(v => v >= 80).length;
+    const periodMed = {};
+    for (const p of ["1M","3M","6M","12M"]) {
+      periodMed[p] = median(items.map(r => r.returns?.[p]).filter(v => v != null));
+    }
+    out.push({
+      name,
+      count: items.length,
+      rs_median: median(rsList),
+      top_pct: rsList.length > 0 ? topCount / rsList.length : 0,
+      "1M": periodMed["1M"], "3M": periodMed["3M"],
+      "6M": periodMed["6M"], "12M": periodMed["12M"],
+    });
+  }
+  // 정렬
+  const dir = state.sortDirS;
+  const key = state.sortKeyS;
+  out.sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "string") return av.localeCompare(bv, "ko") * dir;
+    return (av - bv) * dir;
+  });
+  return out;
+}
+
+function renderSectors() {
+  const tbs = document.getElementById("tbs");
+  const emptyS = document.getElementById("emptyS");
+  const arr = computeSectorStats();
+  emptyS.hidden = arr.length > 0;
+
+  // 정렬 화살표
+  document.querySelectorAll("#ts thead th").forEach(th => {
+    const arrow = th.querySelector(".arrow");
+    if (arrow) arrow.remove();
+    if (state.sortKeyS && th.dataset.ssort === state.sortKeyS) {
+      const a = document.createElement("span");
+      a.className = "arrow";
+      a.textContent = state.sortDirS < 0 ? "▼" : "▲";
+      th.appendChild(a);
+    }
+  });
+  // 선택 지표 강조
+  document.querySelectorAll("#ts th[data-metric], #ts col[data-metric]").forEach(el => {
+    el.classList.toggle("metric-selected", state.metrics.has(el.dataset.metric));
+  });
+
+  const frag = document.createDocumentFragment();
+  arr.forEach((s, i) => {
+    const tr = document.createElement("tr");
+    tr.className = "sector-row";
+    tr.dataset.sector = s.name;
+    const cls = (v) => v == null ? "" : v >= 0 ? "up" : "down";
+    const pct = Math.round((s.top_pct || 0) * 100);
+    const bar = `<div class="sector-bar-wrap"><div class="sector-bar"><span style="width:${pct}%"></span></div><span class="sector-bar-val">${pct}%</span></div>`;
+    const tdM = (html, metric, klass = "") => {
+      const sel = state.metrics.has(metric) ? " metric-selected" : "";
+      return `<td class="${klass}${sel}">${html}</td>`;
+    };
+    tr.innerHTML =
+      `<td class="num">${i+1}</td>` +
+      `<td class="name">${s.name}</td>` +
+      `<td class="num">${s.count}</td>` +
+      `<td class="num rs">${fmtScore(s.rs_median)}</td>` +
+      `<td>${bar}</td>` +
+      tdM(fmtPct(s["1M"]), "1M", "num " + cls(s["1M"])) +
+      tdM(fmtPct(s["3M"]), "3M", "num " + cls(s["3M"])) +
+      tdM(fmtPct(s["6M"]), "6M", "num " + cls(s["6M"])) +
+      tdM(fmtPct(s["12M"]), "12M", "num " + cls(s["12M"]));
+    frag.appendChild(tr);
+  });
+  tbs.innerHTML = "";
+  tbs.appendChild(frag);
+}
+
 function render() {
+  // view 토글에 따라 표 swap
+  const stocksWrap = document.getElementById("stocksWrap");
+  const sectorsWrap = document.getElementById("sectorsWrap");
+  const sectorCtrl = document.getElementById("sector")?.closest(".control");
+  const pageBar = document.querySelector("footer .pagebar");
+  const metricsSummary = document.getElementById("metricsSummary");
+  if (state.view === "sectors") {
+    stocksWrap.hidden = true;
+    sectorsWrap.hidden = false;
+    if (sectorCtrl) sectorCtrl.style.display = "none";  // 섹터 view 에서 섹터 select 숨김
+    if (pageBar) pageBar.style.visibility = "hidden";
+    if (metricsSummary) metricsSummary.style.display = "none";
+    renderSectors();
+    return;
+  }
+  stocksWrap.hidden = false;
+  sectorsWrap.hidden = true;
+  if (sectorCtrl) sectorCtrl.style.display = "";
+  if (pageBar) pageBar.style.visibility = "";
+  if (metricsSummary) metricsSummary.style.display = "";
+  renderStocks();
+}
+
+function renderStocks() {
   const tb = document.getElementById("tb");
   const empty = document.getElementById("empty");
   const arr = filtered();
