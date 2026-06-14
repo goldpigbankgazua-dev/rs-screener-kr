@@ -120,6 +120,20 @@
   .tab { background: var(--panel); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--muted); cursor: pointer; }
   .tab.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 
+  /* ===== view-toggle (종목 / 섹터) sub-tab ===== */
+  .view-toggle { display: inline-flex; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-bottom: 10px; }
+  .vt { background: transparent; border: none; color: var(--muted); padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 7px; transition: all .12s ease; }
+  .vt:hover { color: var(--text); }
+  .vt.active { background: var(--text); color: var(--bg); }
+
+  /* ===== 섹터 표 ===== */
+  .sector-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .sector-bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; min-width: 40px; }
+  .sector-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .sector-bar-val { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 38px; text-align: right; }
+  tr.sector-row { cursor: pointer; }
+  tr.sector-row td.name { font-weight: 600; }
+
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .modebar .label, .periodbar .label { font-size: 11px; color: var(--muted); margin-right: 4px; }
   .modebar .chip.active { background: var(--text); border-color: var(--text); color: var(--bg); }
