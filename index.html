@@ -399,12 +399,15 @@ function filtered() {
     if (state.sector && r.sector !== state.sector) return false;
     if (minCap > 0 && (r.market_cap || 0) < minCap) return false;
     if (q && !(r.name.toLowerCase().includes(q) || r.ticker.includes(q))) return false;
+    // 점수 계산 가능한 종목만 (rs/quality 둘 다 null 인 신규상장/거래정지 종목 제외)
+    if (r.rs == null && r.quality == null) return false;
     return true;
   });
 
   const dir = state.sortDir;
   arr.sort((a, b) => {
     let av = sortValue(a), bv = sortValue(b);
+    // null 은 정렬 방향과 무관하게 항상 뒤로
     if (av == null && bv == null) return 0;
     if (av == null) return 1;
     if (bv == null) return -1;
