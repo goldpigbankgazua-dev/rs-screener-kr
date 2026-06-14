@@ -320,12 +320,33 @@ async function load() {
     const res = await fetch("data/stocks.json?ts=" + Date.now());
     if (!res.ok) throw new Error("HTTP " + res.status);
     state.data = await res.json();
+    computeRanks();
     populateSectors();
     const as = state.data.as_of;
     meta.innerHTML = `기준일 <b>${as.slice(0,4)}-${as.slice(4,6)}-${as.slice(6,8)}</b> · ${state.data.count.toLocaleString()}개 종목`;
     render();
   } catch (e) {
     meta.textContent = "데이터 로드 실패: " + e.message;
+  }
+}
+
+// 각 지표별 시장 내 백분위 (0~1, 1=최강) 한 번 계산해서 캐시
+function computeRanks() {
+  const rows = state.data.rows;
+  state.ranks = {};
+  function getVal(r, m) {
+    if (m === "rs") return r.rs;
+    if (m === "quality") return r.quality;
+    if (m === "acceleration") return r.acceleration;
+    return r.returns?.[m];
+  }
+  for (const m of ALL_METRICS) {
+    const vals = rows.map(r => ({ t: r.ticker, v: getVal(r, m) })).filter(x => x.v != null);
+    vals.sort((a, b) => a.v - b.v);
+    const n = vals.length;
+    const map = {};
+    vals.forEach((x, i) => { map[x.t] = n > 1 ? i / (n - 1) : 0.5; });
+    state.ranks[m] = map;
   }
 }
 
@@ -340,42 +361,24 @@ function populateSectors() {
   }
 }
 
-function compositeScore(r) {
-  const rs = r.rs;
-  const q = r.quality_pct;
-  const a = r.acceleration_pct;
-  if (state.mode === "rsq") {
-    const v = [rs, q].filter(x => x != null);
-    return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null;
-  }
-  if (state.mode === "rsqa") {
-    const v = [rs, q, a].filter(x => x != null);
-    return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null;
-  }
-  return rs;
-}
-
-function periodAvgScore(r) {
-  if (state.periods.size === 0) return null;
+// 선택된 다중 지표의 시장 내 백분위 평균 (선택 없으면 RS 백분위)
+function multiSelectScore(r) {
+  if (!state.ranks) return null;
+  const sel = state.metrics.size > 0 ? [...state.metrics] : ["rs"];
   const v = [];
-  for (const p of state.periods) {
-    const x = r.return_pct?.[p];
+  for (const m of sel) {
+    const x = state.ranks[m]?.[r.ticker];
     if (x != null) v.push(x);
   }
   return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null;
 }
 
-function displayComposite(r) {
-  return state.periods.size > 0 ? periodAvgScore(r) : compositeScore(r);
-}
-
 function sortValue(r) {
   if (state.sortKey) {
     if (PERIODS_ALL.includes(state.sortKey)) return r.returns?.[state.sortKey];
-    if (state.sortKey === "composite") return displayComposite(r);
     return r[state.sortKey];
   }
-  return displayComposite(r);
+  return multiSelectScore(r);
 }
 
 function filtered() {
