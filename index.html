@@ -766,12 +766,14 @@ function renderSectors() {
       `<td class="num">${i+1}</td>` +
       `<td class="name">${s.name}</td>` +
       `<td class="num">${s.count}</td>` +
-      `<td class="num rs">${fmtScore(s.rs_median)}</td>` +
       `<td>${bar}</td>` +
+      tdM(fmtPct(s["1W"]), "1W", "num " + cls(s["1W"])) +
       tdM(fmtPct(s["1M"]), "1M", "num " + cls(s["1M"])) +
       tdM(fmtPct(s["3M"]), "3M", "num " + cls(s["3M"])) +
       tdM(fmtPct(s["6M"]), "6M", "num " + cls(s["6M"])) +
-      tdM(fmtPct(s["12M"]), "12M", "num " + cls(s["12M"]));
+      tdM(fmtPct(s["12M"]), "12M", "num " + cls(s["12M"])) +
+      tdM(fmtPct(s["YTD"]), "YTD", "num " + cls(s["YTD"])) +
+      tdM(`<span class="rs">${fmtScore(s.rs_median)}</span>`, "rs", "num");
     frag.appendChild(tr);
   });
   tbs.innerHTML = "";
@@ -779,26 +781,26 @@ function renderSectors() {
 }
 
 function render() {
-  // view 토글에 따라 표 swap
+  // view 토글에 따라 표 + 종목용 UI 들 숨김/표시
   const stocksWrap = document.getElementById("stocksWrap");
   const sectorsWrap = document.getElementById("sectorsWrap");
-  const sectorCtrl = document.getElementById("sector")?.closest(".control");
+  const periodbar = document.querySelector(".periodbar");
+  const controls = document.querySelector(".controls");
   const pageBar = document.querySelector("footer .pagebar");
   const metricsSummary = document.getElementById("metricsSummary");
+  const stocksOnly = [periodbar, controls, metricsSummary];
   if (state.view === "sectors") {
     stocksWrap.hidden = true;
     sectorsWrap.hidden = false;
-    if (sectorCtrl) sectorCtrl.style.display = "none";  // 섹터 view 에서 섹터 select 숨김
+    stocksOnly.forEach(el => { if (el) el.style.display = "none"; });
     if (pageBar) pageBar.style.visibility = "hidden";
-    if (metricsSummary) metricsSummary.style.display = "none";
     renderSectors();
     return;
   }
   stocksWrap.hidden = false;
   sectorsWrap.hidden = true;
-  if (sectorCtrl) sectorCtrl.style.display = "";
+  stocksOnly.forEach(el => { if (el) el.style.display = ""; });
   if (pageBar) pageBar.style.visibility = "";
-  if (metricsSummary) metricsSummary.style.display = "";
   renderStocks();
 }
 
