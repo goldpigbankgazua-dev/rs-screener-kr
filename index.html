@@ -208,6 +208,11 @@
     <div><b>품질 모드</b> = RS + 품질의 시장 내 순위 평균.&nbsp;&nbsp;<b>가속 모드</b> = RS + 품질 + 가속의 순위 평균.</div>
   </div>
 
+  <div class="view-toggle" id="viewToggle">
+    <button class="vt active" data-view="stocks">종목</button>
+    <button class="vt" data-view="sectors">섹터</button>
+  </div>
+
   <div class="tabbar">
     <div class="tab active" data-market="ALL">전체</div>
     <div class="tab" data-market="KOSPI">KOSPI</div>
@@ -260,7 +265,7 @@
     </div>
   </div>
 
-  <div class="tablewrap">
+  <div class="tablewrap" id="stocksWrap">
     <table id="t">
       <colgroup>
         <col class="c-star"/>
