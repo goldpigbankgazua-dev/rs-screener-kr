@@ -207,18 +207,8 @@
   @media (max-width: 720px) {
     .spectrum-stage { height: 90px; }
     .spec-dot { width: 9px; height: 9px; }
-    /* 섹터 표 — 모바일에서 절반 크기 */
-    #ts { min-width: 0 !important; }
-    #ts th, #ts td { padding: 6px 3px; font-size: 11.5px; }
-    #ts col.c-rank { width: 26px !important; }
-    #ts col.c-score { width: 54px !important; }
-    #ts col.c-period { width: 48px !important; }
-    #ts col[style*="200"] { width: 92px !important; }   /* 섹터명 */
-    #ts col[style*="70"]  { width: 36px !important; }   /* 종목수 */
-    #ts col[style*="140"] { width: 80px !important; }   /* RS≥80 비중 */
-    .sector-bar-wrap { gap: 3px; }
-    .sector-bar { min-width: 24px; height: 5px; }
-    .sector-bar-val { font-size: 10.5px; min-width: 26px; }
+    /* 섹터 표 — "섹터" 컬럼만 모바일에서 좁게 */
+    #ts col[style*="200"] { width: 100px !important; }
   }
 
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
