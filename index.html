@@ -207,8 +207,9 @@
   @media (max-width: 720px) {
     .spectrum-stage { height: 90px; }
     .spec-dot { width: 9px; height: 9px; }
-    /* 섹터 표 — "섹터" 컬럼만 모바일에서 좁게 */
+    /* 섹터 표 — "섹터" 컬럼 좁게, 1M/3M/6M/12M 절반 */
     #ts col[style*="200"] { width: 100px !important; }
+    #ts col.c-period { width: 52px !important; }
   }
 
   .modebar, .periodbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
