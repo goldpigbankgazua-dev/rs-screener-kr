@@ -519,7 +519,7 @@ document.querySelectorAll(".periodbar .chip[data-metric]").forEach(c => {
 });
 document.getElementById("clearPeriods").addEventListener("click", () => {
   state.metrics.clear();
-  document.querySelectorAll(".periodbar .chip[data-period]").forEach(x => x.classList.remove("active"));
+  document.querySelectorAll(".periodbar .chip[data-metric]").forEach(x => x.classList.remove("active"));
   state.sortKey = null; state.page = 1; render();
 });
 document.getElementById("pagesize").addEventListener("change", e => {
