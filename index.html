@@ -693,12 +693,43 @@ function setSort(key) {
   render();
 }
 
+function setSortS(key) {
+  if (!key) return;
+  if (state.sortKeyS === key) state.sortDirS = -state.sortDirS;
+  else { state.sortKeyS = key; state.sortDirS = (key === "name") ? 1 : -1; }
+  render();
+}
+
+function setView(v) {
+  if (state.view === v) return;
+  state.view = v;
+  document.querySelectorAll(".vt").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  render();
+}
+
 function saveFavs() {
   localStorage.setItem("kr_rs_favs", JSON.stringify([...state.favs]));
 }
 
-document.querySelectorAll("thead th").forEach(th => {
+document.querySelectorAll("#t thead th").forEach(th => {
   th.addEventListener("click", () => setSort(th.dataset.sort));
+});
+document.querySelectorAll("#ts thead th").forEach(th => {
+  th.addEventListener("click", () => setSortS(th.dataset.ssort));
+});
+document.querySelectorAll(".vt").forEach(b => {
+  b.addEventListener("click", () => setView(b.dataset.view));
+});
+document.getElementById("tbs").addEventListener("click", (e) => {
+  const row = e.target.closest("tr.sector-row");
+  if (!row) return;
+  state.sector = row.dataset.sector;
+  const sel = document.getElementById("sector");
+  if (sel) sel.value = state.sector;
+  state.view = "stocks";
+  document.querySelectorAll(".vt").forEach(b => b.classList.toggle("active", b.dataset.view === "stocks"));
+  state.page = 1;
+  render();
 });
 document.querySelectorAll(".tab[data-market]").forEach(t => {
   t.addEventListener("click", () => {
