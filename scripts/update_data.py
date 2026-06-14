@@ -27,6 +27,7 @@ PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 31, "3M": 93, "6M": 186, "12M": 372}
 OUT_DIR = Path(__file__).resolve().parents[1] / "data"
 OUT_FILE = OUT_DIR / "stocks.json"
 TICKERS_FILE = OUT_DIR / "tickers.json"
+WICS_FILE = OUT_DIR / "wics_map.json"  # ticker -> WICS 중분류(업종). 1순위 섹터 출처.
 
 # 보통주만: 다음 패턴 제외
 EXCLUDE_NAME_KEYWORDS = ("스팩", "리츠", "ETF", "ETN")
