@@ -312,7 +312,7 @@ const fmtPrice = (v) => v == null ? "–" : v.toLocaleString("ko-KR");
 const fmtCapEok = (v) => v == null || v === 0 ? "–" : Math.round(v / 1e8).toLocaleString("ko-KR");
 const fmtScore = (v) => v == null ? "–" : v.toFixed(1);
 const fmtQuality = (v) => v == null ? "–" : v.toFixed(3);
-const fmtAccel = (v) => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2);
+const fmtAccel = (v) => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2) + "%p";
 
 async function load() {
   const meta = document.getElementById("basedate");
